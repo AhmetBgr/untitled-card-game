@@ -18,17 +18,45 @@ public class UITooltip : MonoBehaviour
     /// The tooltip panel for the current scene. Resolved lazily and including inactive objects,
     /// because the panel spends nearly all of its life hidden — waiting for Awake would mean a
     /// tooltip that never shows.
+    ///
+    /// A scene can hold more than one, each inside the panel it serves (the end-of-match panel's, the
+    /// versus intro's), and those are never up together. So the one handed out is one that can show:
+    /// its parent is live, even though the panel itself is hidden.
     /// </summary>
     public static UITooltip Instance
     {
         get
         {
-            if (instance == null)
-                instance = FindAnyObjectByType<UITooltip>(FindObjectsInactive.Include);
+            if (instance != null && instance.CanShow) return instance;
 
+            UITooltip any = null;
+            foreach (var tooltip in FindObjectsByType<UITooltip>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                if (tooltip.CanShow) return instance = tooltip;
+                if (any == null) any = tooltip;
+            }
+
+            if (instance == null) instance = any;
             return instance;
         }
     }
+
+    /// <summary>
+    /// The tooltip panel nearest <paramref name="element"/>: the first one sitting directly under any of
+    /// its ancestors, so an element shows its own panel's tooltip, drawn over that panel. Falls back to
+    /// <see cref="Instance"/>.
+    /// </summary>
+    public static UITooltip For(Transform element)
+    {
+        for (var ancestor = element != null ? element.parent : null; ancestor != null; ancestor = ancestor.parent)
+            foreach (Transform child in ancestor)
+                if (child.TryGetComponent(out UITooltip tooltip) && tooltip.CanShow) return tooltip;
+
+        return Instance;
+    }
+
+    /// <summary>Switching this panel on would put it on screen: whatever it lives in is up.</summary>
+    private bool CanShow => transform.parent == null || transform.parent.gameObject.activeInHierarchy;
 
     [SerializeField] private TextMeshProUGUI label;
     [Tooltip("Gap in canvas units between the hovered element and the tooltip.")]
@@ -47,8 +75,12 @@ public class UITooltip : MonoBehaviour
         instance = this;
 
         // Authored visible so the panel can be laid out in the editor; hidden before the first frame.
-        gameObject.SetActive(false);
+        // A panel authored hidden wakes inside its first Show instead, which must not be undone here.
+        if (!_showing) gameObject.SetActive(false);
     }
+
+    /// <summary>A Show is switching the panel on: its own Awake, if this is the first, leaves it up.</summary>
+    private bool _showing;
 
     void OnDestroy()
     {
@@ -137,6 +169,9 @@ public class UITooltip : MonoBehaviour
     // Awake may not have run yet), which is why the cached transforms are resolved here.
     void EnsureInitialized()
     {
+        // Only the Show methods get here, each right before switching the panel on.
+        _showing = true;
+
         if (rect == null)
             rect = (RectTransform)transform;
 

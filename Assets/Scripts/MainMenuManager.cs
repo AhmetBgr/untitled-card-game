@@ -5,7 +5,7 @@ using UnityEngine.UI;
 /// <summary>
 /// Drives the title screen. Play opens a popup with the game modes: Quick Play drops straight into a
 /// match with a random hero and a freshly rolled deck on both sides, Custom Game opens the full setup
-/// scene, and Forged in Battle starts a draft gauntlet run in the Draft scene. Settings and Credits
+/// scene, and Forged in Battle starts a draft gauntlet run in the Game scene, on its draft. Settings and Credits
 /// open their own overlays, Quit leaves the game.
 /// </summary>
 public class MainMenuManager : MonoBehaviour
@@ -27,7 +27,7 @@ public class MainMenuManager : MonoBehaviour
     [SerializeField] private Button quickPlayButton;
     [SerializeField] private Button customGameButton;
 
-    [Tooltip("Starts a new draft gauntlet run (see GauntletRun) in the Draft scene.")]
+    [Tooltip("Starts a new draft gauntlet run (see GauntletRun) in the Game scene, on its draft.")]
     [SerializeField] private Button forgedInBattleButton;
 
     [SerializeField] private Button closePlayButton;
@@ -225,7 +225,7 @@ public class MainMenuManager : MonoBehaviour
 
     /// <summary>
     /// Forged in Battle: carries on the saved run where it was left (the draft, a battle to fight again,
-    /// or the end-of-match rewards), or starts a fresh one with the hero pick in the Draft scene.
+    /// or the end-of-match rewards), or starts a fresh one with the hero pick on the Game scene's draft.
     /// </summary>
     void OnForgedInBattle()
     {
@@ -235,8 +235,9 @@ public class MainMenuManager : MonoBehaviour
             return;
         }
 
+        // The whole run is played in the Game scene: it opens on the run's draft (GameOverDraft).
         GauntletRun.StartNew();
-        GoToScene(GauntletRun.Config.draftSceneName);
+        GoToScene(GauntletRun.Config.gameSceneName);
     }
 
     static void Randomize(SaveManager saveManager, SelectionSide side)

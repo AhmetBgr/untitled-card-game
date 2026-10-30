@@ -287,6 +287,40 @@ public static class GauntletRun
 
     public static bool HasEnemyBlessing(GauntletBlessing blessing) => _enemyBlessings.Contains(blessing);
 
+    /// <summary>One encounter's enemy as rolled at the hero pick, for showing any fight of the run.</summary>
+    public class EnemyPreview
+    {
+        public HeroSO Hero { get; internal set; }
+        public IReadOnlyList<GauntletBlessing> Blessings { get; internal set; }
+        public List<HeroPassiveSO> Passives { get; internal set; }
+
+        /// <summary>Enemy hero health after this encounter's multiplier and Bonus Health.</summary>
+        public int StartingHealth { get; internal set; }
+    }
+
+    /// <summary>The enemy of encounter <paramref name="encounterIndex"/>, or null before the enemies are rolled.</summary>
+    public static EnemyPreview PreviewEnemy(int encounterIndex)
+    {
+        if (Config == null || encounterIndex < 0 || encounterIndex >= Config.encounters.Count) return null;
+        if (encounterIndex >= _enemies.Count || _enemies[encounterIndex]?.hero == null) return null;
+
+        var roll = _enemies[encounterIndex];
+        var passives = new List<HeroPassiveSO>(roll.ownPassives);
+        passives.AddRange(roll.extraPassives);
+
+        int printed = roll.hero.defHealth > 0 ? roll.hero.defHealth : roll.hero.health;
+        int hp = Mathf.Max(1, Mathf.RoundToInt(printed * Config.encounters[encounterIndex].enemyHealthMultiplier));
+        if (roll.blessings.Contains(GauntletBlessing.BonusHealth)) hp += Config.bonusHealth;
+
+        return new EnemyPreview
+        {
+            Hero = roll.hero,
+            Blessings = roll.blessings,
+            Passives = passives,
+            StartingHealth = hp,
+        };
+    }
+
     public static int EncounterCount => Config != null ? Config.encounters.Count : 0;
 
     public static GauntletConfigSO.Encounter CurrentEncounter =>
@@ -425,7 +459,8 @@ public static class GauntletRun
                 break;
 
             default:
-                sceneName = Config.draftSceneName;
+                // Between battles: the Game scene opens on the run's draft.
+                sceneName = Config.gameSceneName;
                 break;
         }
         return true;
@@ -1334,8 +1369,8 @@ public static class GauntletRun
     }
 
     /// <summary>
-    /// Leaves a finished battle for the Draft scene, which shows the next draft step or the run's
-    /// result. What the end-of-match Proceed button does during a run.
+    /// Leaves a finished battle for the run's draft, which the Game scene opens on with no match behind
+    /// it (<see cref="GameOverDraft"/>). What the end-of-match Proceed button does during a run.
     /// </summary>
     public static void LeaveBattle()
     {
@@ -1350,7 +1385,35 @@ public static class GauntletRun
             Persist();
         }
 
-        LoadScene(Config != null ? Config.draftSceneName : "Draft");
+        LoadScene(Config != null ? Config.gameSceneName : "Game");
+    }
+
+    /// <summary>
+    /// Goes from a finished battle straight into the next one, with no Draft scene in between: what the
+    /// Fight button on the end-of-match panel's Battles tab does once the win's rewards have been taken.
+    /// The score is credited and the saved end-of-match screen dropped exactly as <see cref="LeaveBattle"/>
+    /// does, so a quit from the next battle restarts that battle rather than coming back to a screen that
+    /// has already been proceeded past.
+    ///
+    /// A run with nothing left to fight -- won, or lost -- has no next battle, so it leaves for the Draft
+    /// scene instead, which is where a run's result is shown.
+    /// </summary>
+    public static void FightNextBattle()
+    {
+        CollectScore();
+
+        if (!IsActive || Outcome != RunOutcome.InProgress)
+        {
+            LeaveBattle();
+            return;
+        }
+
+        _results = null;
+        RestoreResultsPending = false;
+
+        // Puts the rolled enemy in place and marks the run as being in a battle again, saving as it goes.
+        BeginBattle();
+        LoadScene(Config != null ? Config.gameSceneName : "Game");
     }
 
     public static void LoadScene(string sceneName)

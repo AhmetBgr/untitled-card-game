@@ -21,6 +21,12 @@ public class PopupManager : Singleton<PopupManager>
     [Header("Scenes")]
     [SerializeField] private string menuSceneName = "MainMenu";
 
+    [Header("Forged in Battle run over")]
+    [Tooltip("What Replay reads once a run is over: it starts a new run instead.")]
+    [SerializeField] private string newRunLabel = "New Run";
+    [Tooltip("What Proceed reads once a run is over: it ends the run and goes to the main menu.")]
+    [SerializeField] private string mainMenuLabel = "Main Menu";
+
     [Header("Timing")]
     [Tooltip("Seconds to wait before the end-game panel scales in, so the killing blow and the hero's " +
              "death get to play out on a clear board first.")]
@@ -42,19 +48,35 @@ public class PopupManager : Singleton<PopupManager>
         if (exitButton != null) exitButton.onClick.AddListener(ExitToMenu);
     }
 
-    // Replay reruns the match with the decks and heroes already chosen for both sides.
+    // Replay reruns the match with the decks and heroes already chosen for both sides. On a finished
+    // Forged in Battle run it is New Run: the run is over for good, and a fresh one opens on its draft.
     public void Replay()
     {
+        if (RunOver)
+        {
+            GauntletRun.End();
+            GauntletRun.StartNew();
+            GauntletRun.LoadScene(GauntletRun.Config.gameSceneName);
+            return;
+        }
+
         SceneTransitionManager.Instance.TransitionToScene("Game");
     }
 
     // Proceed leaves the match for the main menu, from which the next match can either be started
-    // straight away (Quick Play) or reconfigured (Custom Game). In a Forged in Battle run it goes back
-    // to the Draft scene instead, which shows the next draft step or the run's result. A won battle that
-    // owes rewards never gets here: BattleRewardsPanel opens beside the end-game panel and its own
-    // Proceed replaces this one (see OpenGameOverPopup).
+    // straight away (Quick Play) or reconfigured (Custom Game). In a Forged in Battle run still going it
+    // leaves the battle for the run's draft, which the Game scene opens on; on a finished run it is Main
+    // Menu, and the run goes with it. A won battle that owes rewards never gets here: BattleRewardsPanel
+    // opens beside the end-game panel and its own Proceed replaces this one (see OpenGameOverPopup).
     public void ExitToMenu()
     {
+        if (RunOver)
+        {
+            GauntletRun.End();
+            SceneTransitionManager.Instance.TransitionToScene(menuSceneName);
+            return;
+        }
+
         if (GauntletRun.IsActive)
         {
             GauntletRun.LeaveBattle();
@@ -62,6 +84,40 @@ public class PopupManager : Singleton<PopupManager>
         }
 
         SceneTransitionManager.Instance.TransitionToScene(menuSceneName);
+    }
+
+    /// <summary>A Forged in Battle run that has been won or lost: its last end-of-match screen is its result.</summary>
+    private static bool RunOver => GauntletRun.IsActive && GauntletRun.Outcome != GauntletRun.RunOutcome.InProgress;
+
+    /// <summary>
+    /// Opens the panel on the run's draft rather than a match's result: the Game scene does this, with no
+    /// match set up behind it, whenever the run is between battles -- a new run, or one resumed there. No
+    /// outcome title and no stats: only the Selection tab, locked open until the draft owes nothing
+    /// (<see cref="GameOverDraft"/>).
+    /// </summary>
+    public void OpenDraft()
+    {
+        if (gameOverPopup == null) return;
+
+        // A run left on its draft after it was already decided (an old save): nothing to draft, it is over.
+        if (RunOver)
+        {
+            GauntletRun.End();
+            SceneTransitionManager.Instance.TransitionToScene(menuSceneName);
+            return;
+        }
+
+        if (victoryTitle != null) victoryTitle.gameObject.SetActive(false);
+        if (defeatTitle != null) defeatTitle.gameObject.SetActive(false);
+        if (replayButton != null) replayButton.gameObject.SetActive(false);
+        if (exitButton != null) exitButton.gameObject.SetActive(false);
+
+        var draft = gameOverPopup.GetComponentInChildren<GameOverDraft>(true);
+        var tabs = gameOverPopup.GetComponentInChildren<GameOverTabs>(true);
+        if (tabs != null) tabs.OpenLockedTo(draft != null ? draft.Tab : GameOverTabs.TabKind.Draft);
+
+        OpenPopup(gameOverPopup, true, 0f, null, draft: true);
+        if (draft != null) draft.Begin();
     }
 
     // Win and loss show the identical panel (background, stats, buttons); the only difference is
@@ -98,8 +154,14 @@ public class PopupManager : Singleton<PopupManager>
         if (victoryTitle != null) victoryTitle.gameObject.SetActive(won);
         if (defeatTitle != null) defeatTitle.gameObject.SetActive(!won);
 
-        // A run's battle can't be replayed: a loss ends the run, a win moves on to the next draft.
-        if (replayButton != null) replayButton.gameObject.SetActive(!GauntletRun.IsActive);
+        // A run's battle can't be replayed: a loss ends the run, a win moves on to the next draft. The
+        // battle that decides the run puts New Run and Main Menu up instead.
+        if (replayButton != null) replayButton.gameObject.SetActive(!GauntletRun.IsActive || RunOver);
+        if (RunOver)
+        {
+            SetLabel(replayButton, newRunLabel);
+            SetLabel(exitButton, mainMenuLabel);
+        }
 
         float resolvedDelay = delay ?? gameOverDelay;
 
@@ -118,18 +180,24 @@ public class PopupManager : Singleton<PopupManager>
         // the rewards panel credits the battle's score. The rewards panel's Proceed is the way out, so the
         // panel's own is hidden while it is up; a loss or a finished run keeps it.
         bool rewardsShown = false;
-        if (won && GauntletRun.IsActive)
+        var rewards = BattleRewardsPanel.Resolve();
+        if (won && GauntletRun.IsActive && rewards != null)
         {
-            var rewards = BattleRewardsPanel.Resolve();
-            if (rewards != null)
-            {
-                var xpTrack = gameOverPopup.GetComponentInChildren<BattleXpTrack>(true);
-                // Its rows wait out the panel's entrance: the column they sit in is still sliding in.
-                rewardsShown = rewards.Show(resolvedDelay + openDuration, xpTrack,
-                    gameOverPopup.GetComponent<CanvasGroup>());
-            }
+            var xpTrack = gameOverPopup.GetComponentInChildren<BattleXpTrack>(true);
+            // Its rows wait out the panel's entrance: the column they sit in is still sliding in.
+            rewardsShown = rewards.Show(resolvedDelay + openDuration, xpTrack,
+                gameOverPopup.GetComponent<CanvasGroup>());
         }
+        // Nothing to hand out -- a loss, a decided run, Quick Play: the column is not left showing its
+        // authored placeholder rows.
+        if (!rewardsShown && rewards != null) rewards.gameObject.SetActive(false);
         if (exitButton != null) exitButton.gameObject.SetActive(!rewardsShown);
+    }
+
+    private static void SetLabel(Button button, string label)
+    {
+        var text = button != null ? button.GetComponentInChildren<TMPro.TextMeshProUGUI>(true) : null;
+        if (text != null) text.text = label;
     }
 
     /// <summary>
@@ -147,7 +215,8 @@ public class PopupManager : Singleton<PopupManager>
     public float OpenPopup(Transform popup, bool won = false, float delay = 0f) => OpenPopup(popup, won, delay, null);
 
     /// <param name="restored">A saved end-of-match screen to show as it was, instead of this match's live stats.</param>
-    private float OpenPopup(Transform popup, bool won, float delay, ResultsSave restored)
+    /// <param name="draft">The run's draft (<see cref="OpenDraft"/>): no match, so no stats and no XP to show.</param>
+    private float OpenPopup(Transform popup, bool won, float delay, ResultsSave restored, bool draft = false)
     {
         CloseCurPopup();
         curPopup = popup;
@@ -170,7 +239,11 @@ public class PopupManager : Singleton<PopupManager>
         // Wired before the reveal starts so it is on screen from the first number, and left to itself on
         // panels without one.
         var xpTrack = popup.GetComponentInChildren<BattleXpTrack>(true);
-        if (restored != null)
+        if (draft)
+        {
+            // Nothing was fought: the stats and the track are left as they are, on the Result tab no one can open.
+        }
+        else if (restored != null)
         {
             // Already tallied in the session the battle was fought: the panel lands finished.
             if (xpTrack != null) xpTrack.ShowStatic(won, restored.baseXp, GauntletRun.Xp);
@@ -185,7 +258,9 @@ public class PopupManager : Singleton<PopupManager>
         }
 
         // Posed for the entrance now, played after the delay, so the board is clear of the panel until then.
-        if (intro != null) intro.Play(delay);
+        // The run's draft has no entrance: the scene opens with it already up.
+        if (intro != null && draft) intro.ShowAtOnce();
+        else if (intro != null) intro.Play(delay);
         else curPopup.DOScale(1f, scaleInDuration).SetDelay(delay);
 
         return openDuration;

@@ -210,6 +210,18 @@ public class GameManager : Singleton<GameManager>
             currentState = GameState.EndGame;
             PopupManager.Instance.OpenRestoredResults();
         }
+        // Between battles -- a new run, or one resumed there -- the run's draft opens on the end-of-match
+        // panel instead of a match: the hero, the deck, then the way into the next fight.
+        else if (GauntletRun.IsActive && GauntletRun.Location == GauntletRun.RunLocation.Draft)
+        {
+            currentState = GameState.EndGame;
+
+            // The board stays empty through the draft: the heroes come on once the fight starts.
+            if (player != null && player.hero != null) player.hero.gameObject.SetActive(false);
+            if (opponent != null && opponent.hero != null) opponent.hero.gameObject.SetActive(false);
+
+            PopupManager.Instance.OpenDraft();
+        }
         else
         {
             StartCoroutine(GameLoop());
@@ -355,6 +367,10 @@ public class GameManager : Singleton<GameManager>
         // After Register, so the carried attack replaces the passives' self-stat stamp instead of
         // stacking it again. No-op outside a run and before the first win.
         GauntletRun.RestorePlayerHero(player != null ? player.hero : null);
+
+        // The match-up, over the board: it hides the heroes and their passives, waits for a click, then
+        // lands them on the board. Nothing is dealt until it has.
+        if (VersusIntro.Instance != null) yield return VersusIntro.Instance.Play(player, opponent);
 
         switchController.PlaySwitchAnim(true);
         currentState = GameState.Setup;

@@ -63,6 +63,20 @@ public class HeroPassiveIndicatorView : MonoBehaviour
     private Vector2 _basePosition;
     private bool _hasBasePosition;
 
+    /// <summary>
+    /// The indicators drawing the bound passives, in passive order: where each passive sits on the board.
+    /// Read-only, for something that wants to land on them (the versus intro).
+    /// </summary>
+    public IReadOnlyList<HeroPassiveIndicator> BoundIndicators
+    {
+        get
+        {
+            var bound = new List<HeroPassiveIndicator>(_slots.Count);
+            foreach (var slot in _slots) bound.Add(slot.indicator);
+            return bound;
+        }
+    }
+
     public static HeroPassiveIndicatorView For(MinionController hero)
         => hero != null ? hero.GetComponent<HeroPassiveIndicatorView>() : null;
 

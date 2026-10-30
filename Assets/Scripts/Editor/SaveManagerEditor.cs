@@ -177,7 +177,8 @@ public class SaveManagerEditor : Editor
 
         if (!EditorUtility.DisplayDialog(
                 markTutorialCompleted ? "Clear save data (tutorial completed)?" : "Clear save data?",
-                "This wipes both sides' decks, the high score, and the selected hero and deck — " +
+                "This wipes both sides' decks, the high score, the selected hero and deck, and any " +
+                "Forged in Battle run in progress — " +
                 (markTutorialCompleted
                     ? "and marks the tutorial as already played, so the next launch opens the title screen."
                     : "and re-arms the tutorial, so the next launch plays it again.") + "\n\n" +
@@ -219,6 +220,12 @@ public class SaveManagerEditor : Editor
             PlayerPrefs.DeleteKey(saveManager.saveDataKey);
             PlayerPrefs.Save();
         }
+
+        // The Forged in Battle run lives in a save of its own (GauntletSaveStore), which the file above
+        // does not cover. In Play Mode the run in memory goes too, or the next step would save it back.
+        bool hadRun = GauntletSaveStore.Has();
+        GauntletSaveStore.Delete();
+        if (Application.isPlaying) GauntletRun.Unload();
 
         bool resetLiveInstance = false;
 
@@ -269,6 +276,7 @@ public class SaveManagerEditor : Editor
         }
 
         Debug.Log($"Save data cleared ({deletedFiles} file(s) deleted): {path}" +
+                  (hadRun ? " — Forged in Battle run save deleted." : string.Empty) +
                   (markTutorialCompleted
                       ? " — replaced with a fresh save that counts the tutorial as played."
                       : string.Empty) +

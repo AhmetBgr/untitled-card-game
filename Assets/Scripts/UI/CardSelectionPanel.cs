@@ -25,6 +25,10 @@ public class CardSelectionPanel : MonoBehaviour
 
     [SerializeField] private TextMeshProUGUI promptText;
 
+    [Tooltip("A copy kept for one screen's own picks (the end-of-match rewards): opened only while " +
+             "routed to (Route), and never found as the scene's panel for in-match choices.")]
+    [SerializeField] private bool routedOnly;
+
     [Tooltip("Display-only card prefab used for each option (CardPreview Variant).")]
     [SerializeField] private GameObject optionPrefab;
 
@@ -37,6 +41,21 @@ public class CardSelectionPanel : MonoBehaviour
 
     [Tooltip("How much a hovered option swells, on top of the base scale. The layout group doesn't control child size, so growing a card shifts nothing around it.")]
     [SerializeField] private float hoverScale = 1.2f;
+
+    [Header("Forged preview")]
+    [Tooltip("Shows the forged (upgraded) version of a hovered option under it, so a draft or reward pick " +
+             "can be weighed with what it forges into. Off for in-match choices, which have no forging.")]
+    [SerializeField] private bool showForgedOnHover;
+    [SerializeField] private float forgedPreviewScale = 0.8f;
+    [Tooltip("Space between the bottom of the hovered option (swollen) and the forged preview, in the panel's units.")]
+    [SerializeField] private float forgedPreviewGap = 12f;
+    [Tooltip("Sliced panel drawn behind the forged preview, the way the perk tooltip is boxed. None for a bare card.")]
+    [SerializeField] private Sprite forgedBackdropSprite;
+    [SerializeField] private Color forgedBackdropColor = Color.white;
+    [Tooltip("How far the panel reaches past the preview's visible frame, in the panel's units.")]
+    [SerializeField] private float forgedBackdropPadding = 24f;
+    [Tooltip("The least the preview (backdrop included) stays inside the screen's edges, in the panel's units.")]
+    [SerializeField] private float forgedScreenMargin = 8f;
 
     [Header("Taking a card")]
     [Tooltip("OFF: a taken card resolves the choice outright, with nothing played first. On, the taken " +
@@ -66,6 +85,10 @@ public class CardSelectionPanel : MonoBehaviour
     [SerializeField] private float discardScale = 0.85f;
 
     [Header("See Board")]
+    [Tooltip("Off for a panel with no backdrop to look past (the end-of-match rewards' copy): the " +
+             "button is never shown.")]
+    [SerializeField] private bool offerSeeBoard = true;
+
     [Tooltip("Optional. Toggles the options out of the way so the board underneath can be read. Left " +
              "unassigned, one is built at runtime — same self-installing approach as BoardInteractionGate, " +
              "so the feature needs no scene wiring. Assign your own to restyle it.")]
@@ -94,6 +117,12 @@ public class CardSelectionPanel : MonoBehaviour
     /// <summary>The take / discard animations, killed together when the options are cleared.</summary>
     private readonly List<Sequence> _pickAnims = new List<Sequence>();
 
+    /// <summary>The forged preview under a hovered option, built on first use and reused.</summary>
+    private RectTransform _forgedPreview;
+    private CardModal _forgedModal;
+    private CardView _forgedView;
+    private RectTransform _forgedBackdrop;
+
     // True while the options are tucked away and the player is reading the board.
     private bool _peeking;
 
@@ -117,6 +146,7 @@ public class CardSelectionPanel : MonoBehaviour
     private bool _backdropCaptured;
 
     private static CardSelectionPanel _instance;
+    private static CardSelectionPanel _routed;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
@@ -149,13 +179,23 @@ public class CardSelectionPanel : MonoBehaviour
     /// </summary>
     public static CardSelectionPanel Resolve()
     {
+        if (_routed != null) return _routed;
+
         if (_instance == null)
-        {
-            var found = FindObjectsOfType<CardSelectionPanel>(true);
-            _instance = found.Length > 0 ? found[0] : null;
-        }
+            foreach (var panel in FindObjectsOfType<CardSelectionPanel>(true))
+                if (!panel.routedOnly)
+                {
+                    _instance = panel;
+                    break;
+                }
         return _instance;
     }
+
+    /// <summary>
+    /// Sends every choice to <paramref name="panel"/> until routed back with null: the end-of-match rewards
+    /// open their picks in their own copy of the panel, beside the run's loadout, rather than the match's.
+    /// </summary>
+    public static void Route(CardSelectionPanel panel) => _routed = panel;
 
     /// <summary>Show the panel with these options. Public so the panel can be driven directly, the way
     /// PopupManager exposes OpenPopup/CloseCurPopup.
@@ -230,6 +270,12 @@ public class CardSelectionPanel : MonoBehaviour
                         // Rest scale passed explicitly: the reveal tween below starts the card at zero, so
                         // the component must not infer its resting size from the transform.
                         hover.ConfigureHoverScale(hoverScale, BaseScale);
+
+                        if (showForgedOnHover)
+                        {
+                            GameObject hovered = go; // captured per iteration, like the option itself
+                            hover.HoverChanged += on => ShowForged(on ? option : null, hovered);
+                        }
                     }
                 }
             }
@@ -337,6 +383,107 @@ public class CardSelectionPanel : MonoBehaviour
         }
     }
 
+    // ---------------------------------------------------------------- Forged preview
+
+    /// <summary>
+    /// Shows what <paramref name="option"/> forges into, under the option's card; null hides it. An
+    /// option that is already forged, or has nothing to forge into, shows nothing.
+    /// </summary>
+    private void ShowForged(CardSO option, GameObject card)
+    {
+        CardSO forged = option != null && !option.isUpgraded ? option.upgradedVersion : null;
+        if (forged == null || card == null || !EnsureForgedPreview())
+        {
+            HideForged();
+            return;
+        }
+
+        var owner = GameManager.Instance != null ? GameManager.Instance.player : null;
+        _forgedModal.UpdateModal(forged, owner, true);
+        _forgedView.UpdateView(_forgedModal);
+        _forgedView.SetPlayableOutline(false);
+        _forgedView.SetHoveredOutline(false);
+
+        // Centred under the option as it stands swollen, in this panel's space (the options row sits
+        // unscaled in it), so it never overlaps the options beside the hovered one.
+        var self = (RectTransform)transform;
+        var cardRect = (RectTransform)card.transform;
+        Vector3 local = self.InverseTransformPoint(cardRect.position);
+        float cardHalf = cardRect.rect.height * baseCardScale * hoverScale * 0.5f;
+        float previewHalf = _forgedPreview.rect.height * forgedPreviewScale * 0.5f;
+        _forgedPreview.localPosition = new Vector3(local.x, local.y - cardHalf - forgedPreviewGap - previewHalf, 0f);
+        _forgedPreview.gameObject.SetActive(true);
+
+        var visual = _forgedView.VisualRect != null ? _forgedView.VisualRect : _forgedPreview;
+        if (_forgedBackdrop != null) CardTooltipBackdrop.Fit(_forgedBackdrop, new[] { visual }, forgedBackdropPadding);
+
+        // Kept wholly on screen: an option at the edge of a row, or a low row, would otherwise push its
+        // preview off the bottom or the side.
+        var parentCanvas = GetComponentInParent<Canvas>();
+        if (parentCanvas != null)
+        {
+            Rect bounds = CardTooltipBackdrop.LocalBounds(_forgedBackdrop != null ? new[] { _forgedBackdrop } : new[] { visual }, self);
+            Rect screen = CardTooltipBackdrop.LocalBounds(new[] { (RectTransform)parentCanvas.rootCanvas.transform }, self);
+            var delta = (Vector3)CardTooltipBackdrop.ShiftInside(bounds, screen, forgedScreenMargin);
+            _forgedPreview.localPosition += delta;
+            if (_forgedBackdrop != null) _forgedBackdrop.localPosition += delta;
+        }
+    }
+
+    private void HideForged()
+    {
+        if (_forgedPreview != null) _forgedPreview.gameObject.SetActive(false);
+        if (_forgedBackdrop != null) _forgedBackdrop.gameObject.SetActive(false);
+    }
+
+    /// <summary>
+    /// The forged preview: one more display-only card, on a canvas of its own sorted above the root so
+    /// it draws over the backdrop, with no raycasts so it never takes the hover from the option.
+    /// </summary>
+    private bool EnsureForgedPreview()
+    {
+        if (_forgedPreview != null) return true;
+        if (optionPrefab == null) return false;
+
+        var go = Instantiate(optionPrefab, transform, false);
+        go.name = "ForgedPreview";
+        _forgedPreview = (RectTransform)go.transform;
+        _forgedPreview.anchorMin = _forgedPreview.anchorMax = _forgedPreview.pivot = new Vector2(0.5f, 0.5f);
+        _forgedPreview.localScale = Vector3.one * forgedPreviewScale;
+        _forgedModal = go.GetComponent<CardModal>();
+        _forgedView = go.GetComponent<CardView>();
+        if (_forgedModal == null || _forgedView == null)
+        {
+            Debug.LogWarning("CardSelectionPanel: the option prefab needs a CardModal and a CardView for the forged preview.");
+            Destroy(go);
+            _forgedPreview = null;
+            return false;
+        }
+
+        if (go.TryGetComponent(out Button button)) button.interactable = false;
+
+        var parentCanvas = GetComponentInParent<Canvas>();
+        var root = parentCanvas != null ? parentCanvas.rootCanvas : null;
+        var canvas = go.AddComponent<Canvas>();
+        canvas.overrideSorting = true;
+        if (root != null)
+        {
+            canvas.sortingLayerID = root.sortingLayerID;
+            canvas.sortingOrder = root.sortingOrder + 100;
+        }
+
+        var group = go.AddComponent<CanvasGroup>();
+        group.blocksRaycasts = false;
+        group.interactable = false;
+
+        // Just under the preview's canvas, so it draws over the options but behind the card.
+        if (forgedBackdropSprite != null)
+            _forgedBackdrop = CardTooltipBackdrop.Build(transform, "ForgedPreviewBackdrop", forgedBackdropSprite, forgedBackdropColor, root, canvas.sortingOrder - 1);
+
+        go.SetActive(false);
+        return true;
+    }
+
     /// <summary>Clear the options and hide the panel again.</summary>
     public void Close()
     {
@@ -406,7 +553,7 @@ public class CardSelectionPanel : MonoBehaviour
 
     private void SetUpSeeBoardButton(bool interactive)
     {
-        if (!interactive)
+        if (!interactive || !offerSeeBoard)
         {
             if (seeBoardButton != null) seeBoardButton.gameObject.SetActive(false);
             return;
@@ -501,6 +648,7 @@ public class CardSelectionPanel : MonoBehaviour
         }
         _spawned.Clear();
         _taken = false;
+        HideForged();
     }
 
     // The close delay is a free-standing tween, not bound to this object, so a panel that goes away

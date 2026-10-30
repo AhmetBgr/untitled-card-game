@@ -333,7 +333,7 @@ TextureImporter:
         height: 25
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
-      border: {x: 4, y: 4, z: 4, w: 5}
+      border: {x: 4, y: 6, z: 4, w: 3}
       customData: 
       outline: []
       physicsShape: []
@@ -1080,7 +1080,7 @@ TextureImporter:
         width: 20
         height: 20
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -1102,7 +1102,7 @@ TextureImporter:
         width: 20
         height: 20
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
@@ -1111,6 +1111,50 @@ TextureImporter:
       bones: []
       spriteID: 15c0dc8414218ff49bdccb1f2fea62cb
       internalID: 899568355
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: panel_01_45
+      rect:
+        serializedVersion: 2
+        x: 22
+        y: 362
+        width: 20
+        height: 20
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: fa5330a0c6fdd6f439915a00d3bdb743
+      internalID: -642710867
+      vertices: []
+      indices: 
+      edges: []
+      weights: []
+    - serializedVersion: 2
+      name: panel_01_46
+      rect:
+        serializedVersion: 2
+        x: 22
+        y: 330
+        width: 20
+        height: 20
+      alignment: 0
+      pivot: {x: 0.5, y: 0.5}
+      border: {x: 0, y: 0, z: 0, w: 0}
+      customData: 
+      outline: []
+      physicsShape: []
+      tessellationDetail: 0
+      bones: []
+      spriteID: 7a51ba7551afd054a88a47ce51638c8f
+      internalID: 206516729
       vertices: []
       indices: 
       edges: []
@@ -1169,6 +1213,8 @@ TextureImporter:
       panel_01_42: -1730062020
       panel_01_43: -1818561311
       panel_01_44: 899568355
+      panel_01_45: -642710867
+      panel_01_46: 206516729
       panel_01_5: -67600548
       panel_01_6: -2024813826
       panel_01_7: 703188476

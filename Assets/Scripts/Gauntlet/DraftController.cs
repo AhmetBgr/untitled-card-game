@@ -8,17 +8,21 @@ using UnityEngine.UI;
 /// <summary>
 /// Drives the Draft scene of Forged in Battle. Every visit to the scene shows whichever step the
 /// <see cref="GauntletRun"/> is on:
-///   1. no hero yet: pick 1 of N heroes in the draft panel;
+///   1. no hero yet: pick 1 of N heroes in the draft panel (the Draft tab);
 ///   2. card picks owed: pick 1 of N base cards in the draft panel, until the step's picks are done.
 ///      A claimed card milestone owes picks the same way (upgraded cards too); a perk milestone owes a
 ///      pick of 1 of N passives;
 ///   3. a reached milestone unclaimed: the draft panel asks for it to be claimed. Hovering a milestone
 ///      on the track previews it in the draft panel, clicking a reached one claims it;
-///   4. nothing owed: the draft panel hides and the upcoming battle's skull on the track becomes the way
-///      in: clicking it keeps the Next Match panel up and shows the Proceed button under the skull.
-///      Hovering that skull previews the enemy at any point once a hero is picked, mid-draft included;
+///   4. nothing owed: the Draft tab slides away for the Next Match tab, the upcoming battle, with the
+///      Proceed button under its skull. Proceed sits there through the whole draft, greyed out until the
+///      picks are done; mid-draft, hovering that skull previews the enemy;
 ///   5. run over: the result in the draft panel's header, with New Run and Main Menu.
 /// Entering the scene with no run active (from the menu, or opened directly in the editor) starts one.
+///
+/// The top bar's tabs (<see cref="DraftSceneTabs"/>) own the panels. While anything is owed (and on the
+/// result step) the Draft tab is open and the others are locked; once the draft is done it switches to
+/// Next Match by itself, and Next Match and Statistics can be switched between.
 ///
 /// Card options are drawn with the same display-only card prefab the in-match card choice uses
 /// (CardPreview Variant); hero options use the HeroPanel prefab, like the player's own hero panel.
@@ -39,8 +43,11 @@ public class DraftController : MonoBehaviour
     }
 
     [Header("Draft panel")]
-    [SerializeField] private GameObject draftPanel;
     [SerializeField] private TextMeshProUGUI draftHeaderText;
+    [Tooltip("The header and option box: hidden while the draft-completed image is up.")]
+    [SerializeField] private GameObject draftPickContent;
+    [Tooltip("Shown in the draft panel once nothing is owed, in place of the pick box.")]
+    [SerializeField] private GameObject draftCompletedImage;
     [Tooltip("Parent the option cards are spawned under; drives their layout.")]
     [SerializeField] private Transform optionsContainer;
     [Tooltip("Display-only card prefab used for each option (CardPreview Variant).")]
@@ -69,9 +76,14 @@ public class DraftController : MonoBehaviour
     [SerializeField] private GauntletHeroPanelView enemyHero;
 
     [Header("Next match")]
-    [SerializeField] private GameObject nextMatchPanel;
     [SerializeField] private TextMeshProUGUI nextMatchHeaderText;
     [SerializeField] private TextMeshProUGUI nextMatchRulesText;
+    [Tooltip("One tab per fight on the opponent panel; reset to the upcoming one on every refresh.")]
+    [SerializeField] private OpponentFightTabs fightTabs;
+
+    [Header("Tabs")]
+    [Tooltip("Draft / Next Match / Statistics. Locked on Draft while a pick is owed.")]
+    [SerializeField] private DraftSceneTabs tabs;
 
     [Header("Battle track")]
     [SerializeField] private BattleNode[] battleNodes;
@@ -87,7 +99,7 @@ public class DraftController : MonoBehaviour
     [SerializeField] private PerkOptionView perkOptionPrefab;
 
     [Header("Buttons")]
-    [Tooltip("Proceed on the briefing step (sits under the selected skull); New Run on the result step.")]
+    [Tooltip("Proceed under the upcoming skull (greyed out while a pick is owed); New Run on the result step.")]
     [SerializeField] private Button primaryButton;
     [SerializeField] private TextMeshProUGUI primaryButtonLabel;
     [Tooltip("Back to the main menu; only shown once the run is over.")]
@@ -111,8 +123,7 @@ public class DraftController : MonoBehaviour
 
     private readonly List<GameObject> _spawned = new List<GameObject>();
     private readonly List<CardButtonHandler> _deckEntries = new List<CardButtonHandler>();
-    private bool _nextMatchPinned;
-    private bool _draftPanelShown;
+    private bool _tabsShown;
     private bool _leaving;
     private float _rulesFontSize;
 
@@ -149,6 +160,7 @@ public class DraftController : MonoBehaviour
         if (nextMatchRulesText != null) _rulesFontSize = nextMatchRulesText.fontSize;
         ClearAuthoredPlaceholders();
         HookBattleNodes();
+        if (fightTabs != null) fightTabs.FightShown += ShowFight;
         if (milestoneTrack != null)
         {
             milestoneTrack.NodeHovered += OnMilestoneHover;
@@ -162,8 +174,6 @@ public class DraftController : MonoBehaviour
 
     private void Refresh()
     {
-        _nextMatchPinned = false;
-
         bool inProgress = GauntletRun.Outcome == GauntletRun.RunOutcome.InProgress;
 
         // The enemy is rolled as soon as the hero is known (so a mirror can be avoided), and kept until
@@ -176,19 +186,42 @@ public class DraftController : MonoBehaviour
         RefreshNextMatch();
         RefreshTrack();
         if (milestoneTrack != null) milestoneTrack.RefreshStates();
-        SetNextMatchVisible(false);
 
         if (menuButtonLabel != null) menuButtonLabel.text = mainMenuLabel;
         if (menuButton != null) menuButton.gameObject.SetActive(!inProgress);
         if (abandonButton != null) abandonButton.gameObject.SetActive(inProgress);
 
         ShowStep();
+
+        RefreshTabs();
+    }
+
+    /// <summary>
+    /// Draft while anything is owed, Next Match once the draft is done. Entering the scene opens the right
+    /// one outright; finishing the draft slides over to Next Match.
+    /// </summary>
+    private void RefreshTabs()
+    {
+        if (tabs == null) return;
+
+        bool drafted = CanFight;
+        var current = tabs.Current;
+
+        if (!_tabsShown) tabs.Select(drafted ? DraftSceneTabs.TabKind.NextMatch : DraftSceneTabs.TabKind.Draft, animate: false);
+        else if (!drafted && current != DraftSceneTabs.TabKind.Draft) tabs.Select(DraftSceneTabs.TabKind.Draft, animate: true);
+        else if (drafted && current == DraftSceneTabs.TabKind.Draft) tabs.Select(DraftSceneTabs.TabKind.NextMatch, animate: true);
+        else tabs.EndPeek();
+        _tabsShown = true;
+
+        bool open = drafted && !_leaving;
+        tabs.SetInteractable(draftTab: !_leaving, nextMatchTab: open, statisticsTab: open && GauntletRun.Battles.Count > 0);
     }
 
     /// <summary>Fills the draft panel for the step the run is on. Also restores it after a milestone preview.</summary>
     private void ShowStep()
     {
         ClearOptions();
+        SetDraftCompleted(false);
 
         if (GauntletRun.Outcome != GauntletRun.RunOutcome.InProgress) ShowResult();
         else if (GauntletRun.Hero == null) ShowHeroPick();
@@ -203,7 +236,7 @@ public class DraftController : MonoBehaviour
     private void ShowHeroPick()
     {
         SetDraftPanel("Choose Your Hero");
-        SetPrimary(null);
+        ShowProceed();
 
         SpawnHeroOptions(GauntletRun.RollHeroOptions(), picked =>
         {
@@ -225,7 +258,7 @@ public class DraftController : MonoBehaviour
             string what = GauntletRun.PickingUpgraded ? "an Upgraded Card" : "a New Card";
             SetDraftPanel($"Draft {what} For Your Deck {pickNumber}/{GauntletRun.PicksThisStep}");
         }
-        SetPrimary(null);
+        ShowProceed();
 
         SpawnOptions(GauntletRun.CurrentCardOptions(), picked =>
         {
@@ -237,7 +270,7 @@ public class DraftController : MonoBehaviour
     private void ShowPerkPick()
     {
         SetDraftPanel("Draft a New Perk For Your Hero");
-        SetPrimary(null);
+        ShowProceed();
 
         SpawnPerkOptions(GauntletRun.CurrentPerkOptions, picked =>
         {
@@ -250,15 +283,15 @@ public class DraftController : MonoBehaviour
     private void ShowMilestonePrompt()
     {
         SetDraftPanel(WithSubtitle("Milestone Reached!", "Click a glowing milestone to claim its reward"));
-        SetPrimary(null);
+        ShowProceed();
     }
 
-    /// <summary>Picks done: the track's upcoming skull takes over (see <see cref="OnNodeClicked"/>).</summary>
+    /// <summary>Picks done: the Next Match tab shows the upcoming battle, and Proceed opens up.</summary>
     private void ShowBriefing()
     {
-        // What an instant milestone reward just did stays up until the player moves on.
         SetDraftPanel(GauntletRun.LastRewardMessage);
-        SetPrimary(null);
+        SetDraftCompleted(true);
+        ShowProceed();
     }
 
     private void ShowResult()
@@ -375,11 +408,12 @@ public class DraftController : MonoBehaviour
     }
 
     /// <summary>
-    /// Previews are only for the time between picks: while a pick is owed, or the Proceed button is up,
-    /// the draft panel stays on that.
+    /// Previews are only for the time between picks: while a pick is owed the draft panel stays on that,
+    /// and they are not shown over the Statistics tab.
     /// </summary>
     private bool CanPreviewMilestones =>
-        !_leaving && !_nextMatchPinned
+        !_leaving
+        && (tabs == null || (tabs.Current != DraftSceneTabs.TabKind.Statistics && !tabs.IsSwitching))
         && GauntletRun.Outcome == GauntletRun.RunOutcome.InProgress
         && GauntletRun.MilestonesUnlocked
         && GauntletRun.PendingPicks == 0 && !GauntletRun.PendingPerkPick
@@ -389,8 +423,17 @@ public class DraftController : MonoBehaviour
     {
         if (!CanPreviewMilestones) return;
 
-        if (entered) ShowMilestonePreview(index);
-        else ShowStep();
+        if (entered)
+        {
+            // The preview is shown in the draft panel, over the briefing if that is the open tab.
+            tabs?.Peek(DraftSceneTabs.TabKind.Draft);
+            ShowMilestonePreview(index);
+        }
+        else
+        {
+            ShowStep();
+            tabs?.EndPeek();
+        }
     }
 
     private void OnMilestoneClicked(int index)
@@ -418,8 +461,8 @@ public class DraftController : MonoBehaviour
         else status = $"{GauntletRun.MilestoneRewardDescription(milestone.Reward)}. Click to claim";
 
         ClearOptions();
+        SetDraftCompleted(false);
         SetDraftPanel(WithSubtitle($"{milestone.Xp} XP: {GauntletRun.MilestoneRewardName(milestone.Reward)}", status));
-        SetPrimary(null);
 
         if (!milestone.Reached || milestone.Claimed) return;
 
@@ -450,7 +493,6 @@ public class DraftController : MonoBehaviour
             int index = i;
             AddTrigger(trigger, EventTriggerType.PointerEnter, () => OnNodeHover(index, true));
             AddTrigger(trigger, EventTriggerType.PointerExit, () => OnNodeHover(index, false));
-            AddTrigger(trigger, EventTriggerType.PointerClick, () => OnNodeClicked(index));
         }
     }
 
@@ -463,21 +505,13 @@ public class DraftController : MonoBehaviour
 
     private static bool IsUpcoming(int nodeIndex) => GauntletBattleTrack.IsUpcoming(nodeIndex);
 
+    /// <summary>Mid-draft the upcoming skull previews the enemy; once drafted, the briefing has its own tab.</summary>
     private void OnNodeHover(int index, bool entered)
     {
-        if (_leaving || _nextMatchPinned || !IsUpcoming(index)) return;
-        SetNextMatchVisible(entered);
-    }
+        if (_leaving || CanFight || !IsUpcoming(index) || tabs == null) return;
 
-    private void OnNodeClicked(int index)
-    {
-        // Mid-draft the skull is hover-only: clicking does nothing until the deck is drafted.
-        if (_leaving || !IsUpcoming(index) || !CanFight) return;
-
-        _nextMatchPinned = true;
-        SetNextMatchVisible(true);
-        SetPrimary(proceedLabel);
-        PlacePrimary(battleNodes[index].skull.rectTransform);
+        if (entered) tabs.Peek(DraftSceneTabs.TabKind.NextMatch);
+        else tabs.EndPeek();
     }
 
     private void RefreshTrack()
@@ -520,31 +554,36 @@ public class DraftController : MonoBehaviour
 
     // ---------------------------------------------------------------- View
 
+    /// <summary>Swaps the draft panel's pick box for the draft-completed image, or back.</summary>
+    private void SetDraftCompleted(bool completed)
+    {
+        if (draftCompletedImage != null) draftCompletedImage.SetActive(completed);
+        if (draftPickContent != null) draftPickContent.SetActive(!completed);
+    }
+
+    /// <summary>The draft panel's header; the panel itself is shown and hidden by its tab.</summary>
     private void SetDraftPanel(string header)
     {
-        _draftPanelShown = header != null;
-        if (draftPanel != null) draftPanel.SetActive(_draftPanelShown && !IsNextMatchVisible);
         if (header != null && draftHeaderText != null) draftHeaderText.text = header;
     }
 
-    private void SetNextMatchVisible(bool visible)
+    /// <summary>Proceed under the upcoming skull; it only works once the picks are done.</summary>
+    private void ShowProceed()
     {
-        if (nextMatchPanel == null) return;
+        SetPrimary(proceedLabel, CanFight);
 
-        nextMatchPanel.SetActive(visible);
-
-        // The two panels overlap: while the enemy is previewed mid-draft, the options make way for it.
-        if (draftPanel != null) draftPanel.SetActive(_draftPanelShown && !visible);
+        int upcoming = GauntletRun.EncounterIndex;
+        if (battleNodes != null && upcoming >= 0 && upcoming < battleNodes.Length && battleNodes[upcoming] != null)
+            PlacePrimary(battleNodes[upcoming].skull != null ? battleNodes[upcoming].skull.rectTransform : null);
     }
 
-    private bool IsNextMatchVisible => nextMatchPanel != null && nextMatchPanel.activeSelf;
-
     /// <summary>Shows the primary button with this label, or hides it for null.</summary>
-    private void SetPrimary(string label)
+    private void SetPrimary(string label, bool interactable = true)
     {
         if (primaryButton == null) return;
 
         primaryButton.gameObject.SetActive(label != null);
+        primaryButton.interactable = interactable && !_leaving;
         if (label != null && primaryButtonLabel != null) primaryButtonLabel.text = label;
     }
 
@@ -554,13 +593,21 @@ public class DraftController : MonoBehaviour
         if (menuButton != null) menuButton.interactable = interactable;
         if (backButton != null) backButton.interactable = interactable;
         if (abandonButton != null) abandonButton.interactable = interactable;
+        if (!interactable) tabs?.SetInteractable(false, false, false);
         foreach (var go in _spawned)
             if (go != null)
                 foreach (var b in go.GetComponentsInChildren<Button>(true)) b.interactable = interactable;
     }
 
-    private void RefreshNextMatch() =>
-        GauntletNextMatch.Refresh(enemyHero, nextMatchHeaderText, nextMatchRulesText, _rulesFontSize);
+    private void RefreshNextMatch()
+    {
+        if (fightTabs != null) fightTabs.ResetToNext(GauntletRun.EncounterIndex);
+        else GauntletNextMatch.Refresh(enemyHero, nextMatchHeaderText, nextMatchRulesText, _rulesFontSize);
+    }
+
+    /// <summary>The opponent panel filled with one fight of the run, from its fight tabs.</summary>
+    private void ShowFight(int encounterIndex) =>
+        GauntletNextMatch.RefreshEncounter(encounterIndex, enemyHero, nextMatchHeaderText, nextMatchRulesText, _rulesFontSize);
 
     private void RefreshDeck() =>
         GauntletDeckList.Refresh(deckHeaderText, deckEntryTemplate, _deckEntries, GauntletRun.Deck);

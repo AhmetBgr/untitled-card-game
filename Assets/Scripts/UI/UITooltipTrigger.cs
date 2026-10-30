@@ -16,6 +16,9 @@ public class UITooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPointerExi
              "PassiveSelectionController), since a prefab cannot reference a scene object.")]
     [SerializeField] private Transform point;
 
+    /// <summary>The panel this element showed its text on, so the exit hides that one.</summary>
+    private UITooltip _shown;
+
     public string Message
     {
         get => message;
@@ -31,23 +34,23 @@ public class UITooltipTrigger : MonoBehaviour, IPointerEnterHandler, IPointerExi
 
     public void OnPointerEnter(PointerEventData eventData)
     {
-        if (UITooltip.Instance == null) return;
+        _shown = UITooltip.For(transform);
+        if (_shown == null) return;
 
-        if (point != null) UITooltip.Instance.ShowAt(message, point);
-        else UITooltip.Instance.Show(message, (RectTransform)transform);
+        if (point != null) _shown.ShowAt(message, point);
+        else _shown.Show(message, (RectTransform)transform);
     }
 
-    public void OnPointerExit(PointerEventData eventData)
-    {
-        if (UITooltip.Instance != null)
-            UITooltip.Instance.Hide();
-    }
+    public void OnPointerExit(PointerEventData eventData) => HideShown();
 
     // A disabled object never receives OnPointerExit, so the tooltip would otherwise stay on screen
     // after the element it describes goes away.
-    void OnDisable()
+    void OnDisable() => HideShown();
+
+    private void HideShown()
     {
-        if (UITooltip.Instance != null)
-            UITooltip.Instance.Hide();
+        var tooltip = _shown != null ? _shown : UITooltip.Instance;
+        if (tooltip != null) tooltip.Hide();
+        _shown = null;
     }
 }

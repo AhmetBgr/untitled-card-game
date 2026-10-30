@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 
@@ -11,6 +12,9 @@ using UnityEngine;
 public class BattleRewardLoadout : MonoBehaviour
 {
     [SerializeField] private GauntletHeroPanelView hero;
+    [Tooltip("Covers the hero panel while the run has no hero yet; slides off when one is picked " +
+             "(PlayHeroUnlock).")]
+    [SerializeField] private RectTransform heroLockedImage;
 
     [Header("Deck list")]
     [SerializeField] private TextMeshProUGUI deckHeaderText;
@@ -26,18 +30,24 @@ public class BattleRewardLoadout : MonoBehaviour
     private readonly List<CardButtonHandler> _deckEntries = new List<CardButtonHandler>();
     private bool _placeholdersCleared;
     private bool _shifted;
+    private Sequence _heroUnlock;
 
     /// <summary>
     /// Shows the run as it stands, so a pick just taken is already in the deck.
     /// Pass <paramref name="shiftPanels"/> false when nothing is in the way: the end-of-match review tabs
     /// (<see cref="DraftPanelTabs"/>) show the loadout on its own, with no card options to make room for.
+    /// Pass <paramref name="activate"/> false to fill it in where it stands without switching it on: a
+    /// pick reopened from a save behind a tab that is not up (<see cref="BattleRewardsPanel"/>).
     /// </summary>
-    public void Show(bool shiftPanels = true)
+    public void Show(bool shiftPanels = true, bool activate = true)
     {
         if (!GauntletRun.IsActive) return;
 
-        gameObject.SetActive(true);
-        if (shiftPanels) Shift(true);
+        if (activate)
+        {
+            gameObject.SetActive(true);
+            if (shiftPanels) Shift(true);
+        }
         if (!_placeholdersCleared)
         {
             GauntletDeckList.ClearPlaceholders(deckEntryTemplate);
@@ -45,7 +55,39 @@ public class BattleRewardLoadout : MonoBehaviour
         }
 
         hero?.ShowRunHero();
+        // Left alone while it is sliding off: the pick that starts the slide redraws the loadout too.
+        if (heroLockedImage != null && (_heroUnlock == null || !_heroUnlock.IsActive()))
+            heroLockedImage.gameObject.SetActive(GauntletRun.Hero == null);
         GauntletDeckList.Refresh(deckHeaderText, deckEntryTemplate, _deckEntries, GauntletRun.Deck);
+    }
+
+    /// <summary>
+    /// The hero panel's lock coming off once a hero is picked: the locked image slides right, then
+    /// shrinks to nothing -- the passive chips' unlock (<see cref="PassiveChipButton.PlayUnlock"/>),
+    /// sideways. Afterwards it is switched off and put back where it was authored. Returned so the
+    /// caller can time what follows; null when there is no locked image.
+    /// </summary>
+    public Sequence PlayHeroUnlock(float slideDistance, float slideDuration, float shrinkDuration)
+    {
+        if (heroLockedImage == null) return null;
+        if (_heroUnlock != null && _heroUnlock.IsActive()) _heroUnlock.Complete();
+
+        var image = heroLockedImage;
+        Vector2 home = image.anchoredPosition;
+        Vector3 size = image.localScale;
+        image.gameObject.SetActive(true);
+
+        _heroUnlock = DOTween.Sequence();
+        _heroUnlock.Append(image.DOAnchorPosX(home.x + slideDistance, slideDuration).SetEase(Ease.OutQuad));
+        _heroUnlock.Append(image.DOScale(Vector3.zero, shrinkDuration).SetEase(Ease.InQuad));
+        _heroUnlock.OnComplete(() =>
+        {
+            if (image == null) return;
+            image.gameObject.SetActive(false);
+            image.anchoredPosition = home;
+            image.localScale = size;
+        });
+        return _heroUnlock;
     }
 
     /// <summary>
@@ -55,6 +97,9 @@ public class BattleRewardLoadout : MonoBehaviour
     /// </summary>
     public RectTransform DeckAnchor =>
         deckHeaderText != null ? (RectTransform)deckHeaderText.transform : (RectTransform)transform;
+
+    /// <summary>The hero's passive row, in slot order; null when the panel has none wired.</summary>
+    public IReadOnlyList<PassiveChipButton> PassiveChips => hero?.passiveChips;
 
     /// <summary>
     /// The chip a perk taken on the rewards screen is about to fill: the first free slot on the hero's

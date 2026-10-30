@@ -24,6 +24,10 @@ public class PerkSelectionPanel : MonoBehaviour
 
     [SerializeField] private TextMeshProUGUI promptText;
 
+    [Tooltip("A copy kept for one screen's own picks (the end-of-match rewards), wired to it directly: " +
+             "never found as the scene's panel.")]
+    [SerializeField] private bool routedOnly;
+
     [Tooltip("The perk option template: Assets/Prefabs/UI/PerkOption.prefab, which owns the look of an " +
              "option (its size, its fonts and its hover).")]
     [SerializeField] private PerkOptionView optionPrefab;
@@ -76,10 +80,12 @@ public class PerkSelectionPanel : MonoBehaviour
     public static PerkSelectionPanel Resolve()
     {
         if (_instance == null)
-        {
-            var found = FindObjectsByType<PerkSelectionPanel>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-            _instance = found.Length > 0 ? found[0] : null;
-        }
+            foreach (var panel in FindObjectsByType<PerkSelectionPanel>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                if (!panel.routedOnly)
+                {
+                    _instance = panel;
+                    break;
+                }
         return _instance;
     }
 

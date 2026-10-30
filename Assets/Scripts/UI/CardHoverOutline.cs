@@ -36,6 +36,12 @@ public class CardHoverOutline : MonoBehaviour, IPointerEnterHandler, IPointerExi
         _restScale = restScale;
     }
 
+    /// <summary>
+    /// The pointer has come onto the card (true) or left it (false). Also raised with false when the
+    /// component is disabled under the pointer, so a listener never stays stuck on.
+    /// </summary>
+    public event System.Action<bool> HoverChanged;
+
     public void OnPointerEnter(PointerEventData eventData)
     {
         View.SetHoveredOutline(true);
@@ -44,6 +50,8 @@ public class CardHoverOutline : MonoBehaviour, IPointerEnterHandler, IPointerExi
         var modal = GetComponent<CardModal>();
         if (modal != null)
             KeywordTooltip.Show(modal.desc, (RectTransform)transform, this);
+
+        HoverChanged?.Invoke(true);
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -51,6 +59,7 @@ public class CardHoverOutline : MonoBehaviour, IPointerEnterHandler, IPointerExi
         View.SetHoveredOutline(false);
         ScaleTo(_restScale);
         KeywordTooltip.Hide(this);
+        HoverChanged?.Invoke(false);
     }
 
     private void ScaleTo(Vector3 target)
@@ -69,6 +78,7 @@ public class CardHoverOutline : MonoBehaviour, IPointerEnterHandler, IPointerExi
         // out — otherwise a pooled/reused view would come back lit and still swollen.
         View.SetHoveredOutline(false);
         KeywordTooltip.Hide(this);
+        HoverChanged?.Invoke(false);
 
         if (Mathf.Approximately(hoverScale, 1f)) return;
         transform.DOKill();

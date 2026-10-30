@@ -13,6 +13,9 @@ public class SceneTransitionManager : MonoBehaviour
 
     private bool isTransitioning = false;
 
+    /// <summary>A fade is under way: the screen is still going to black or coming back from it.</summary>
+    public bool IsTransitioning => isTransitioning;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)

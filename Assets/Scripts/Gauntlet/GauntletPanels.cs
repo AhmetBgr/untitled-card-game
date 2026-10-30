@@ -174,14 +174,50 @@ public static class GauntletNextMatch
     }
 
     /// <summary>
+    /// Fills the panel with encounter <paramref name="encounterIndex"/>: any fight of the run, its enemy as
+    /// rolled at the hero pick. The upcoming one reads the same as <see cref="Refresh"/>.
+    /// </summary>
+    public static void RefreshEncounter(int encounterIndex, GauntletHeroPanelView enemyHero,
+        TextMeshProUGUI headerText, TextMeshProUGUI rulesText, float rulesFontSize)
+    {
+        var config = GauntletRun.Config;
+        var encounter = config != null && encounterIndex >= 0 && encounterIndex < config.encounters.Count
+            ? config.encounters[encounterIndex]
+            : null;
+        var enemy = GauntletRun.PreviewEnemy(encounterIndex);
+
+        if (enemyHero != null)
+            enemyHero.Show(enemy?.Hero, enemy?.StartingHealth ?? 0, enemy?.Hero != null ? enemy.Hero.attack : 0, enemy?.Passives);
+
+        if (headerText != null)
+            headerText.text = encounter != null && !string.IsNullOrEmpty(encounter.label)
+                ? encounter.label
+                : $"Battle {encounterIndex + 1}";
+
+        if (rulesText == null) return;
+        if (encounter == null || enemy == null)
+        {
+            rulesText.text = string.Empty;
+            return;
+        }
+
+        rulesText.enableAutoSizing = true;
+        rulesText.fontSizeMax = rulesFontSize;
+        rulesText.fontSizeMin = rulesFontSize * 0.6f;
+        rulesText.text = BlessingRules(enemy.Blessings);
+    }
+
+    /// <summary>
     /// The enemy's blessings under one header, one line each; stacked ones (Extra Passive) once, with a count.
     /// </summary>
-    public static string BlessingRules()
+    public static string BlessingRules() => BlessingRules(GauntletRun.EnemyBlessings);
+
+    /// <summary>The same, for any enemy's blessings.</summary>
+    public static string BlessingRules(IReadOnlyList<GauntletBlessing> blessings)
     {
         var rules = new System.Text.StringBuilder();
 
-        var blessings = GauntletRun.EnemyBlessings;
-        if (blessings.Count > 0) rules.Append("> Enemy blessings:");
+        //if (blessings.Count > 0) rules.Append("> Enemy blessings:");
 
         var listed = new List<GauntletBlessing>();
         foreach (var blessing in blessings)
@@ -192,8 +228,8 @@ public static class GauntletNextMatch
             int stacks = 0;
             foreach (var b in blessings) if (b == blessing) stacks++;
 
-            rules.Append($"\n<color=#FFD36B>{GauntletRun.BlessingName(blessing)}{(stacks > 1 ? $" x{stacks}" : "")}</color>: " +
-                         GauntletRun.BlessingDescription(blessing));
+            rules.Append($"<color=#FFD36B>{GauntletRun.BlessingName(blessing)}{(stacks > 1 ? $" x{stacks}" : "")}</color>: " +
+                         GauntletRun.BlessingDescription(blessing) + "\n");
         }
 
         return rules.ToString();

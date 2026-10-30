@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -13,8 +13,11 @@ using UnityEngine.UI;
 /// It lists two kinds of reward, one row each:
 ///   * the new cards a win is worth (<see cref="GauntletRun.PendingBattleReward"/>): the row runs the
 ///     picks it owes one at a time through the match's own <see cref="CardSelectionPanel"/>, by way of
-///     <see cref="CardChoice"/>, so a reward pick looks exactly like an in-match Discover. The panel
-///     hides itself while the options are up and comes back between picks;
+///     <see cref="CardChoice"/>, so a reward pick looks exactly like an in-match Discover -- routed to
+///     the end-of-match panel's own copy of it, beside the run's loadout. On the review tabs a pick
+///     slides that selection tab in over Result, and taking the reward slides Result back; the tab bar
+///     stays up, so the pick can be left open while other tabs are read. Without the tabs the panel
+///     hides itself while the options are up;
 ///   * every milestone the battle's XP just reached: the row is added the moment the track under the
 ///     end-of-match panel fills up to it (<see cref="BattleXpTrack.XpShown"/>), and claims it. Instant
 ///     rewards apply on the spot and the row says what they did, an
@@ -24,9 +27,11 @@ using UnityEngine.UI;
 /// The battle's score is credited here rather than on the way out (<see cref="GauntletRun.CollectScore"/>),
 /// so the milestones the win reaches are already reached by the time the rows are built.
 ///
-/// Rewards are not skippable: Proceed stays locked until nothing is owed, then leaves for the Draft scene
-/// (<see cref="GauntletRun.LeaveBattle"/>), which is what the end-of-match Proceed did before this panel
-/// existed. The panel GameObject is authored DISABLED, like CardSelectionPanel, so it is resolved lazily
+/// Rewards are not skippable: Proceed stays locked until nothing is owed. It then opens the end-of-match
+/// panel's Battles tab, the briefing for the next battle, which the panel's Proceed leads into without the
+/// Draft scene in between (<see cref="GameOverTabs"/>, <see cref="GameOverVersus"/>); with no tabs authored, or with no battle
+/// left to fight, it leaves for the Draft scene (<see cref="GauntletRun.LeaveBattle"/>) as it always did.
+/// The panel GameObject is authored DISABLED, like CardSelectionPanel, so it is resolved lazily
 /// through <see cref="Resolve"/> rather than cached from Awake.
 /// </summary>
 public class BattleRewardsPanel : MonoBehaviour
@@ -89,6 +94,14 @@ public class BattleRewardsPanel : MonoBehaviour
              "looked up in the scene; with none there at all the pick is left to the Draft scene.")]
     [SerializeField] private PerkSelectionPanel perkPanel;
 
+    [Tooltip("Where card rewards are picked, beside the loadout: every card choice is routed here while a " +
+             "pick is up. Left empty, the match's own card panel is used.")]
+    [SerializeField] private CardSelectionPanel cardPanel;
+
+    [Tooltip("The end-of-match tab the loadout and the selection panels sit on. A pick slides it in, and " +
+             "taking the reward slides back to Result.")]
+    [SerializeField] private GameOverTabs.TabKind pickTab = GameOverTabs.TabKind.Draft;
+
     [Header("Milestone rewards")]
     [Tooltip("Icon on a milestone row whose reward has none of its own in the catalog " +
              "(MilestoneRewardCatalogSO). A perk option shows the passive's own icon instead.")]
@@ -123,6 +136,9 @@ public class BattleRewardsPanel : MonoBehaviour
     /// <summary>A perk is being picked in the perk panel; nothing here can be taken or proceeded past.</summary>
     private bool _pickingPerk;
 
+    /// <summary>A pick is being reopened from a save: put on its tab, but that tab is not brought up.</summary>
+    private bool _pickInBackground;
+
     /// <summary>What that row will read once its picks are taken.</summary>
     private string _pickingTakenLabel;
 
@@ -139,6 +155,9 @@ public class BattleRewardsPanel : MonoBehaviour
 
     /// <summary>Added on demand: what fades the Proceed button while it is locked.</summary>
     private CanvasGroup _proceedGroup;
+
+    /// <summary>Proceed has handed the run over to the Battles tab; nothing here is owed any more.</summary>
+    private bool _handedOver;
 
     /// <summary>The end-of-match panel's XP track, followed so milestone rows land as the bar reaches them.</summary>
     private BattleXpTrack _xpSource;
@@ -203,6 +222,7 @@ public class BattleRewardsPanel : MonoBehaviour
 
         _leaving = false;
         _pickBlocked = false;
+        _handedOver = false;
 
         UnsubscribeXp();
         _companion = companion;
@@ -307,12 +327,27 @@ public class BattleRewardsPanel : MonoBehaviour
 
     /// <summary>
     /// Restored with a pick under way -- the player left with the card or perk options on screen: put the
-    /// same options back up for the row they belong to.
+    /// same options back up for the row they belong to. On the review tabs they go back on the pick tab
+    /// without bringing it up: the panel still opens on Result, and the pick's row leads to it, as it
+    /// does to any pick left open.
     /// </summary>
     private void ResumeOpenPick()
     {
         if (_restoring == null || _leaving || _pickingPerk || _pickingRow != null) return;
 
+        _pickInBackground = true;
+        try
+        {
+            ReopenPick();
+        }
+        finally
+        {
+            _pickInBackground = false;
+        }
+    }
+
+    private void ReopenPick()
+    {
         if (GauntletRun.PendingPerkPick)
         {
             var perkRow = _rows.Find(r => r.milestone == GauntletRun.ActiveMilestone);
@@ -393,9 +428,18 @@ public class BattleRewardsPanel : MonoBehaviour
     /// <summary>Rows only invite a click while what they give can be taken right now.</summary>
     private void RefreshRows()
     {
+        // A pick left open on its tab: the rest wait for it, and its own row is the way back to it.
+        bool picking = _pickingRow != null || _pickingPerk;
+
         foreach (var row in _rows)
         {
             if (row.taken) continue;
+            if (picking)
+            {
+                SetClickable(row, row == _pickingRow || row == _perkRow);
+                continue;
+            }
+
             SetClickable(row, row.milestone < 0
                 ? GauntletRun.PendingBattleReward && GauntletRun.PendingPicks == 0
                   && !GauntletRun.PendingPerkPick
@@ -485,6 +529,7 @@ public class BattleRewardsPanel : MonoBehaviour
 
     private void OnCardRowClicked(Row row)
     {
+        if (BackToOpenPick(row)) return;
         if (_leaving || !GauntletRun.BeginBattleCardPicks()) return;
 
         _pickingRow = row;
@@ -511,8 +556,8 @@ public class BattleRewardsPanel : MonoBehaviour
             : Or(GauntletRun.Catalog.BattleCardsPrompt(pickNumber, GauntletRun.PicksThisStep),
                 string.Format(cardPickPrompt, pickNumber, GauntletRun.PicksThisStep));
 
-        gameObject.SetActive(false);
-        SetCompanionVisible(false);
+        ShowPickScreen();
+        if (cardPanel != null) CardSelectionPanel.Route(cardPanel);
         CardChoice.Instance.Begin(GauntletRun.CurrentCardOptions(), prompt, OnCardPicked, requirePlayerTurn: false);
 
         // Nothing to pick from (no options rolled, or the match is in a state that refuses a choice): the
@@ -521,7 +566,7 @@ public class BattleRewardsPanel : MonoBehaviour
         {
             if (loadout != null)
             {
-                loadout.Show();
+                loadout.Show(activate: !_pickInBackground || PickTabs == null);
 
                 // Still handed over, so turning the card animation back on needs no rewiring here.
                 var cardPanel = CardSelectionPanel.Resolve();
@@ -532,6 +577,8 @@ public class BattleRewardsPanel : MonoBehaviour
         {
             Debug.LogWarning("BattleRewardsPanel: no card choice could be opened; the picks are left to the Draft scene.");
             _pickBlocked = true;
+            _pickingRow = null;
+            _pickingTakenLabel = null;
             ReturnToPanel();
         }
     }
@@ -557,12 +604,69 @@ public class BattleRewardsPanel : MonoBehaviour
     /// <summary>Back from a pick: the panel comes straight up, already scaled in.</summary>
     private void ReturnToPanel()
     {
-        if (loadout != null) loadout.Hide();
-        SetCompanionVisible(true);
+        CardSelectionPanel.Route(null);
+
+        var tabs = PickTabs;
+        if (tabs != null)
+        {
+            // The loadout is the pick tab's panel: it slides out with the tab rather than vanishing.
+            tabs.Select(GameOverTabs.TabKind.Result, animate: true);
+        }
+        else
+        {
+            if (loadout != null) loadout.Hide();
+            SetCompanionVisible(true);
+        }
+
         gameObject.SetActive(true);
         transform.DOKill();
         transform.localScale = Vector3.one;
         RefreshRows();
+    }
+
+    /// <summary>
+    /// Puts a pick's screen up. With the review tabs, the pick tab -- the loadout and the selection
+    /// panels -- slides in over Result, which goes on tallying off screen. The tab bar stays: the player
+    /// can leave the pick open for any other tab and come back to it through its row (the other rows
+    /// wait for it). Without the tabs, this panel steps off and the end-of-match panel fades.
+    /// </summary>
+    private void ShowPickScreen()
+    {
+        var tabs = PickTabs;
+        if (tabs != null)
+        {
+            if (!_pickInBackground) tabs.Select(pickTab, animate: true);
+            RefreshRows();
+            return;
+        }
+
+        gameObject.SetActive(false);
+        SetCompanionVisible(false);
+    }
+
+    /// <summary>
+    /// A row clicked while a pick is open, after the player left its tab: the row being picked brings the
+    /// pick tab back, and any other does nothing until that pick is taken.
+    /// </summary>
+    private bool BackToOpenPick(Row row)
+    {
+        bool picking = _pickingRow != null || _pickingPerk;
+        if (!picking) return false;
+
+        var tabs = PickTabs;
+        if (tabs != null && (row == _pickingRow || row == _perkRow)) tabs.Select(pickTab, animate: true);
+        return true;
+    }
+
+    /// <summary>The end-of-match review tabs, when a run has them up; null for the plain panel.</summary>
+    private static GameOverTabs PickTabs
+    {
+        get
+        {
+            if (!GauntletRun.IsActive) return null;
+            var tabs = GameOverTabs.Resolve();
+            return tabs != null && tabs.isActiveAndEnabled ? tabs : null;
+        }
     }
 
     /// <summary>
@@ -599,6 +703,7 @@ public class BattleRewardsPanel : MonoBehaviour
 
     private void OnMilestoneRowClicked(Row row, int index)
     {
+        if (BackToOpenPick(row)) return;
         if (_leaving || !GauntletRun.CanClaim(index)) return;
 
         var reward = GauntletRun.Milestones[index].Reward;
@@ -642,8 +747,7 @@ public class BattleRewardsPanel : MonoBehaviour
 
         if (perkPanel == null) perkPanel = PerkSelectionPanel.Resolve();
 
-        gameObject.SetActive(false);
-        SetCompanionVisible(false);
+        ShowPickScreen();
 
         bool opened = perkPanel != null
             && perkPanel.Open(GauntletRun.CurrentPerkOptions, perkPickPrompt, TakePerk);
@@ -654,7 +758,7 @@ public class BattleRewardsPanel : MonoBehaviour
         {
             if (loadout != null)
             {
-                loadout.Show();
+                loadout.Show(activate: !_pickInBackground || PickTabs == null);
 
                 // Shown first, so the passive row is filled in and its first free slot can be found:
                 // the locked slot that unlocks to reveal the perk once it is taken.
@@ -726,13 +830,32 @@ public class BattleRewardsPanel : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// True while nothing the battle paid out is still owed: what unlocks Proceed, and with it anything
+    /// else that leaves for the next battle. It stays true once Proceed has handed over, so the way on is
+    /// not locked behind the very click that brought it up.
+    /// </summary>
+    public bool Settled => _handedOver || CanProceed;
+
     private void OnProceed()
     {
         if (!CanProceed) return;
 
-        _leaving = true;
         UnsubscribeXp();
         if (proceedButton != null) proceedButton.interactable = false;
+
+        // In a run with a battle still to fight, Proceed hands over to the end-of-match panel's Battles
+        // tab, its briefing; the Draft scene is only loaded when there is nothing left to fight,
+        // or when this panel is the whole end-of-match screen (no tabs authored).
+        var tabs = GameOverTabs.Resolve();
+        if (tabs != null && GauntletRun.IsActive && GauntletRun.Outcome == GauntletRun.RunOutcome.InProgress)
+        {
+            _handedOver = true;
+            tabs.Select(GameOverTabs.TabKind.Battles, animate: true);
+            return;
+        }
+
+        _leaving = true;
         GauntletRun.LeaveBattle();
     }
 

@@ -13,6 +13,9 @@ public class MinionView : MonoBehaviour
     [SerializeField] private SpriteRenderer frame;
     [SerializeField] private SpriteRenderer art;
 
+    /// <summary>The frame sprite: where the hero's portrait sits on the board, and in what tint.</summary>
+    public SpriteRenderer Frame => frame;
+
     [SerializeField] private TextMeshProUGUI attacktext;
     [SerializeField] private TextMeshProUGUI healthtext;
 

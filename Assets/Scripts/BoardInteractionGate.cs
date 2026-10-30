@@ -146,6 +146,9 @@ public class BoardInteractionGate : MonoBehaviour
         // delivery — hover feedback would keep lighting up behind the menu without this.
         if (EscMenuController.IsOpen) return true;
 
+        // The match-up opening the match covers the board; its heroes are only landing there.
+        if (VersusIntro.IsUp) return true;
+
         if (_gm.currentState == GameState.EndGame) return true;
         if (CardChoice.Instance.HasActiveRequest) return true;
         if (_popup != null && _popup.HasOpenPopup) return true;
