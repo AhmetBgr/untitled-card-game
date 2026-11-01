@@ -96,7 +96,7 @@ MonoBehaviour:
   battleCards:
     offered: Add {0} cards to your deck
     acquired: '{0} cards added to your deck'
-    pickPrompt: Draft a New Card For Your Deck {0}/{1}
+    pickPrompt: Choose a card for your deck ({0}/{1})
     offeredOne: Add a card to your deck
     acquiredOne: Card added to your deck
     icon: {fileID: 21300000, guid: 454af15abfdad9c4f9815be3d2026489, type: 3}

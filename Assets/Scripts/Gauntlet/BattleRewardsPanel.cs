@@ -15,7 +15,7 @@ using UnityEngine.UI;
 ///     picks it owes one at a time through the match's own <see cref="CardSelectionPanel"/>, by way of
 ///     <see cref="CardChoice"/>, so a reward pick looks exactly like an in-match Discover -- routed to
 ///     the end-of-match panel's own copy of it, beside the run's loadout. On the review tabs a pick
-///     slides that selection tab in over Result, and taking the reward slides Result back; the tab bar
+///     fades that selection tab in over Result, and taking the reward fades Result back; the tab bar
 ///     stays up, so the pick can be left open while other tabs are read. Without the tabs the panel
 ///     hides itself while the options are up;
 ///   * every milestone the battle's XP just reached: the row is added the moment the track under the
@@ -84,7 +84,7 @@ public class BattleRewardsPanel : MonoBehaviour
     [Tooltip("Taken label of an Upgraded Cards milestone worth a single card.")]
     [SerializeField] private string upgradedCardTakenLabel = "Upgraded card added to your deck";
     [Tooltip("Prompt over the card options; {0} is the pick being made and {1} the picks owed.")]
-    [SerializeField] private string cardPickPrompt = "Draft a New Card For Your Deck {0}/{1}";
+    [SerializeField] private string cardPickPrompt = "Choose a card for your deck ({0}/{1})";
     [Tooltip("Prompt of a Duplicate milestone's pick.")]
     [SerializeField] private string duplicatePickPrompt = "Choose a Card to Duplicate";
     [Tooltip("The run's hero and deck, shown beside the options while a card or a perk is picked.")]
@@ -609,7 +609,11 @@ public class BattleRewardsPanel : MonoBehaviour
         var tabs = PickTabs;
         if (tabs != null)
         {
-            // The loadout is the pick tab's panel: it slides out with the tab rather than vanishing.
+            // The loadout is the pick tab's panel: it goes with the tab rather than vanishing. The
+            // pick tab is a fadeSwitch tab, so this fades -- and the selection panel, still on because
+            // its own close left it so, fades out with the rest of the tab before the park switches the
+            // whole thing off.
+            SetPanelsKeptOnClose(false);
             tabs.Select(GameOverTabs.TabKind.Result, animate: true);
         }
         else
@@ -626,7 +630,8 @@ public class BattleRewardsPanel : MonoBehaviour
 
     /// <summary>
     /// Puts a pick's screen up. With the review tabs, the pick tab -- the loadout and the selection
-    /// panels -- slides in over Result, which goes on tallying off screen. The tab bar stays: the player
+    /// panels -- fades in over Result, which fades out and goes on tallying off screen. A quick fade
+    /// rather than the review's slide: the options have to be there at once. The tab bar stays: the player
     /// can leave the pick open for any other tab and come back to it through its row (the other rows
     /// wait for it). Without the tabs, this panel steps off and the end-of-match panel fades.
     /// </summary>
@@ -635,6 +640,10 @@ public class BattleRewardsPanel : MonoBehaviour
         var tabs = PickTabs;
         if (tabs != null)
         {
+            // The selection panels leave with the tab's fade from here on, not by switching themselves
+            // off the moment the choice resolves.
+            SetPanelsKeptOnClose(true);
+
             if (!_pickInBackground) tabs.Select(pickTab, animate: true);
             RefreshRows();
             return;
@@ -667,6 +676,18 @@ public class BattleRewardsPanel : MonoBehaviour
             var tabs = GameOverTabs.Resolve();
             return tabs != null && tabs.isActiveAndEnabled ? tabs : null;
         }
+    }
+
+    /// <summary>
+    /// Hands the selection panels' going-away over to the pick tab's fade, or gives it back to them.
+    /// A panel that switches its own object off on close snaps out a frame before that fade starts --
+    /// it closes before the reward is marked taken and the tab is switched -- so only the loadout
+    /// beside it would be seen to fade (<see cref="CardSelectionPanel.KeepOnClose"/>).
+    /// </summary>
+    private void SetPanelsKeptOnClose(bool kept)
+    {
+        if (cardPanel != null) cardPanel.KeepOnClose = kept;
+        if (perkPanel != null) perkPanel.KeepOnClose = kept;
     }
 
     /// <summary>
@@ -836,6 +857,28 @@ public class BattleRewardsPanel : MonoBehaviour
     /// not locked behind the very click that brought it up.
     /// </summary>
     public bool Settled => _handedOver || CanProceed;
+
+    /// <summary>
+    /// True while a reward pick's options are the screen the player is on: a card or a perk pick is open
+    /// and the tab it sits on is the one up. A pick left open while another tab is read does not count,
+    /// nor does one reopened from a save into the background.
+    ///
+    /// What the end-of-match panel's Collect Rewards button stays out of the way of
+    /// (<see cref="GameOverVersus"/>): it sits in the same bottom-right corner the selection panel
+    /// reaches into, and it is a way back to rewards the player is already in the middle of taking.
+    /// </summary>
+    public bool PickShowing
+    {
+        get
+        {
+            if (_pickingRow == null && !_pickingPerk) return false;
+
+            // Without the tabs the pick owns the whole screen -- this panel steps off and the
+            // end-of-match panel fades (ShowPickScreen) -- so it is up either way.
+            var tabs = PickTabs;
+            return tabs == null || tabs.Current == pickTab;
+        }
+    }
 
     private void OnProceed()
     {

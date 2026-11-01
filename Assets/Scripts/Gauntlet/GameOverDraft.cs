@@ -60,7 +60,7 @@ public class GameOverDraft : MonoBehaviour
 
     [Header("Card and perk picks")]
     [Tooltip("{0} is the pick being made, {1} the picks this step, {2} 'a New Card' or 'an Upgraded Card'.")]
-    [SerializeField] private string cardPickPrompt = "Draft {2} For Your Deck {0}/{1}";
+    [SerializeField] private string cardPickPrompt = "Choose {2} for your deck ({0}/{1})";
     [SerializeField] private string duplicatePickPrompt = "Choose a Card to Duplicate";
     [SerializeField] private string perkPickPrompt = "Draft a New Perk For Your Hero";
 
@@ -69,22 +69,20 @@ public class GameOverDraft : MonoBehaviour
     [SerializeField] private GameOverTabs.TabKind draftTab = GameOverTabs.TabKind.Draft;
 
     [Header("Done")]
-    [Tooltip("\"Click anywhere to proceed\": shown where the options were once nothing is owed, beside the " +
-             "deck and the hero. A click anywhere on the screen then leaves for the fight; the panel's Proceed " +
-             "and the top buttons stay away for the whole draft.")]
+    [Tooltip("The Proceed button: shown where the options were once nothing is owed, beside the deck and " +
+             "the hero. Clicking it leaves for the fight; the panel's own Proceed and the top buttons " +
+             "stay away for the whole draft.")]
     [SerializeField] private CanvasGroup proceedPrompt;
-    [Tooltip("Wait after the last pick before the prompt shows and clicks count, so the pick's card can land.")]
+    [Tooltip("The button inside that prompt. It is the only way on from here -- a click anywhere else " +
+             "does nothing -- and it stays dead until the prompt has finished fading up.")]
+    [SerializeField] private Button proceedButton;
+    [Tooltip("Wait after the last pick before the prompt shows and the button takes clicks, so the " +
+             "pick's card can land.")]
     [SerializeField] private float promptDelay = 0.4f;
     [SerializeField] private float promptFadeDuration = 0.3f;
-    [Range(0f, 1f)] [SerializeField] private float promptPulseAlpha = 0.35f;
-    [SerializeField] private float promptPulseDuration = 0.8f;
 
     private readonly List<GameObject> _heroOptions = new List<GameObject>();
     private bool _leaving;
-
-    /// <summary>Nothing owed: the prompt is up (or on its way), and a click anywhere goes to the fight.</summary>
-    private bool _done;
-    private float _clicksFrom;
 
     /// <summary>
     /// True from <see cref="Begin"/> until the draft leaves for the fight: the panel's Proceed
@@ -124,6 +122,11 @@ public class GameOverDraft : MonoBehaviour
         ShowStep();
     }
 
+    private void Awake()
+    {
+        if (proceedButton != null) proceedButton.onClick.AddListener(Go);
+    }
+
     private void OnDestroy()
     {
         Active = false;
@@ -132,25 +135,9 @@ public class GameOverDraft : MonoBehaviour
         HideProceedPrompt();
     }
 
-    // Polled: the prompt's click can land on anything, a deck card or the hero included, so it is read
-    // off the input rather than through a raycast target (the way the match-up's own prompt is).
-    private void Update()
-    {
-        if (!_done || _leaving || Time.unscaledTime < _clicksFrom) return;
-        if (ClickedAnywhere()) Go();
-    }
-
-    private static bool ClickedAnywhere()
-    {
-        if (EscMenuController.IsOpen || ConfirmationPopup.IsOpen) return false;
-        if (Input.GetMouseButtonDown(0)) return true;
-        return Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began;
-    }
-
     private void ShowStep()
     {
         ClearHeroOptions();
-        _done = false;
         HideProceedPrompt();
         if (heroPick != null) heroPick.SetActive(false);
 
@@ -310,7 +297,7 @@ public class GameOverDraft : MonoBehaviour
         string prompt = GauntletRun.PickingDuplicate
             ? duplicatePickPrompt
             : string.Format(cardPickPrompt, pickNumber, GauntletRun.PicksThisStep,
-                GauntletRun.PickingUpgraded ? "an Upgraded Card" : "a New Card");
+                GauntletRun.PickingUpgraded ? "an upgraded card" : "a card");
 
         if (cardPanel != null) CardSelectionPanel.Route(cardPanel);
         CardChoice.Instance.Begin(GauntletRun.CurrentCardOptions(), prompt, OnCardPicked, requirePlayerTurn: false);
@@ -362,12 +349,7 @@ public class GameOverDraft : MonoBehaviour
     /// the fight. The tabs stay locked and the top buttons put away -- there is nothing else to read here,
     /// and the panel's Proceed stays hidden (<see cref="Active"/>).
     /// </summary>
-    private void Finish()
-    {
-        _done = true;
-        _clicksFrom = Time.unscaledTime + promptDelay;
-        ShowProceedPrompt();
-    }
+    private void Finish() => ShowProceedPrompt();
 
     private void ShowProceedPrompt()
     {
@@ -376,13 +358,24 @@ public class GameOverDraft : MonoBehaviour
         proceedPrompt.DOKill();
         proceedPrompt.gameObject.SetActive(true);
         proceedPrompt.alpha = 0f;
-        proceedPrompt.blocksRaycasts = false;
-        proceedPrompt.interactable = false;
 
-        // The pulse is its own tween: DOTween won't loop forever inside a Sequence.
-        proceedPrompt.DOFade(1f, promptFadeDuration).SetDelay(promptDelay).SetUpdate(true).OnComplete(() =>
-            proceedPrompt.DOFade(promptPulseAlpha, promptPulseDuration).SetEase(Ease.InOutSine)
-                .SetLoops(-1, LoopType.Yoyo).SetUpdate(true));
+        // Raycasts reach it, so the button takes clicks and the crossed swords can tell the pointer is
+        // over them (<see cref="ProceedPromptSwords"/>). The hover zone is the only raycast target
+        // under the prompt, so nothing else there can swallow a click.
+        proceedPrompt.blocksRaycasts = true;
+        proceedPrompt.interactable = true;
+
+        // Dead until it is up: the delay and the fade below are what the old click window waited out,
+        // so the button takes over that job rather than a timestamp doing it.
+        if (proceedButton != null) proceedButton.interactable = false;
+
+        // Up once and stays up. No alpha pulse: the swords swinging are what says the button is live,
+        // and a pulse over the top of them only made the blades fade in and out as they swung.
+        proceedPrompt.DOFade(1f, promptFadeDuration).SetDelay(promptDelay).SetUpdate(true)
+            .OnComplete(() =>
+            {
+                if (proceedButton != null) proceedButton.interactable = true;
+            });
     }
 
     private void HideProceedPrompt()
@@ -391,6 +384,7 @@ public class GameOverDraft : MonoBehaviour
 
         proceedPrompt.DOKill();
         proceedPrompt.alpha = 0f;
+        if (proceedButton != null) proceedButton.interactable = false;
         proceedPrompt.gameObject.SetActive(false);
     }
 

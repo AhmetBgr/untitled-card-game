@@ -136,6 +136,76 @@ public static class GauntletDeckList
 }
 
 /// <summary>
+/// The player's own "blessings": the run's claimed milestone rewards that still shape every battle to
+/// come, worded like an enemy's blessings and stacked the same way ("Bonus Health x2"). Shared by the
+/// versus intro (<see cref="VersusIntro"/>), which lists them under the player's hero, and the Hero Info
+/// tab of the end-of-match panel (<see cref="GameOverHeroInfo"/>).
+/// </summary>
+public static class GauntletPlayerBlessings
+{
+    /// <summary>Rewards that last for the rest of the run; a card pick is spent the moment it is taken.</summary>
+    public static readonly MilestoneReward[] LastingRewards =
+    {
+        MilestoneReward.BonusHealth,
+        MilestoneReward.BonusAttack,
+        MilestoneReward.BiggerHand,
+        MilestoneReward.ForgePerk,
+        MilestoneReward.NewPerk,
+    };
+
+    /// <summary>
+    /// The claimed lasting rewards, each once, in the order they were first claimed, with how many
+    /// times each was claimed. Empty outside a run.
+    /// </summary>
+    public static void Collect(List<MilestoneReward> listed, List<int> stacks)
+    {
+        listed.Clear();
+        stacks.Clear();
+        if (!GauntletRun.IsActive) return;
+
+        foreach (var milestone in GauntletRun.Milestones)
+        {
+            if (!milestone.Claimed || System.Array.IndexOf(LastingRewards, milestone.Reward) < 0) continue;
+
+            int at = listed.IndexOf(milestone.Reward);
+            if (at >= 0) stacks[at]++;
+            else
+            {
+                listed.Add(milestone.Reward);
+                stacks.Add(1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Fills <paramref name="list"/> with one row per claimed lasting reward, cloning
+    /// <paramref name="prefab"/> into <paramref name="rows"/> as more are needed and hiding the spares.
+    /// Returns how many rows are showing.
+    /// </summary>
+    public static int Fill(RectTransform list, BlessingRow prefab, List<BlessingRow> rows)
+    {
+        var listed = new List<MilestoneReward>();
+        var stacks = new List<int>();
+        Collect(listed, stacks);
+
+        if (list == null || prefab == null) return listed.Count;
+
+        while (rows.Count < listed.Count)
+            rows.Add(Object.Instantiate(prefab, list));
+
+        for (int i = 0; i < rows.Count; i++)
+        {
+            bool used = i < listed.Count;
+            rows[i].gameObject.SetActive(used);
+            if (used)
+                rows[i].Show(GauntletRun.MilestoneRewardName(listed[i]),
+                    GauntletRun.MilestoneRewardDescription(listed[i]), stacks[i]);
+        }
+        return listed.Count;
+    }
+}
+
+/// <summary>
 /// The upcoming battle's briefing: the enemy hero as it will actually be fielded, the encounter's label
 /// and the blessings it fights with. Shared by the Draft scene's Next Match panel
 /// (<see cref="DraftController"/>) and the copy of that panel on the end-of-match review tabs

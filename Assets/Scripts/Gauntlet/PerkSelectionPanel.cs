@@ -123,11 +123,20 @@ public class PerkSelectionPanel : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// While set, <see cref="Close"/> clears the options but leaves the panel's object on, because
+    /// something around it is fading it away: the end-of-match tab a reward pick sits on, whose fade
+    /// switch takes the whole tab out (<see cref="GameOverTabs"/>). The same hand-over
+    /// <see cref="CardSelectionPanel.KeepOnClose"/> describes, and set by the same owner
+    /// (<see cref="BattleRewardsPanel"/>).
+    /// </summary>
+    public bool KeepOnClose { get; set; }
+
     public void Close()
     {
         Clear();
         _onPicked = null;
-        gameObject.SetActive(false);
+        if (!KeepOnClose) gameObject.SetActive(false);
     }
 
     /// <summary>

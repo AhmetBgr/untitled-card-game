@@ -46,8 +46,14 @@ public class VersusIntro : MonoBehaviour
 
     [SerializeField] private BlessingRow blessingRowPrefab;
 
-    [Tooltip("\"Click anywhere to start\".")]
+    [Tooltip("The Proceed button that starts the match: the same crossed-swords button the run's draft " +
+             "ends on (ProceedPromptButton). This is what is faded up and pulsed once the match-up has " +
+             "finished arriving.")]
     [SerializeField] private CanvasGroup clickLabel;
+
+    [Tooltip("The button inside that prompt. It is the only way on -- a click anywhere else does " +
+             "nothing -- and it stays dead until the prompt has finished fading up.")]
+    [SerializeField] private Button proceedButton;
 
     [Tooltip("Where the portraits and chips are moved for their flight, outside the faded content.")]
     [SerializeField] private RectTransform flyers;
@@ -104,8 +110,6 @@ public class VersusIntro : MonoBehaviour
     [Tooltip("Wait after everything has come in before the label shows. Clicks count from when it starts showing.")]
     [SerializeField] private float labelDelay = 0f;
     [SerializeField] private float labelFadeDuration = 0.3f;
-    [Range(0f, 1f)] [SerializeField] private float labelPulseAlpha = 0.35f;
-    [SerializeField] private float labelPulseDuration = 0.8f;
 
     [Header("Disappear: fade")]
     [SerializeField] private float fadeOutDelay = 0f;
@@ -151,15 +155,6 @@ public class VersusIntro : MonoBehaviour
     [SerializeField] private float hiddenFadeInDelay = 0f;
     [SerializeField] private float hiddenFadeInDuration = 0.3f;
     [SerializeField] private Ease hiddenFadeInEase = Ease.Linear;
-
-    private static readonly MilestoneReward[] LastingRewards =
-    {
-        MilestoneReward.BonusHealth,
-        MilestoneReward.BonusAttack,
-        MilestoneReward.BiggerHand,
-        MilestoneReward.ForgePerk,
-        MilestoneReward.NewPerk,
-    };
 
     /// <summary>A UI piece moved under <see cref="flyers"/> for its flight, and how to put it back.</summary>
     private class Flyer
@@ -217,6 +212,13 @@ public class VersusIntro : MonoBehaviour
         if (content != null) content.gameObject.SetActive(false);
         if (backdrop != null) _backdropAlpha = backdrop.color.a;
         if (separator != null) _separatorRotation = separator.localRotation;
+
+        // The way on. Dismiss is what the old click-anywhere set too, so the wait loop is unchanged.
+        if (proceedButton != null)
+        {
+            proceedButton.onClick.AddListener(Dismiss);
+            proceedButton.interactable = false;
+        }
     }
 
     private void OnDestroy()
@@ -261,10 +263,14 @@ public class VersusIntro : MonoBehaviour
         if (labelDelay > 0f) yield return new WaitForSeconds(labelDelay);
         StartLabelPulse();
 
-        // Anywhere: the backdrop is under the panels, which would swallow a click aimed at a hero.
+        // The Proceed button is the way on, and Dismiss is what it calls; a click anywhere else on the
+        // match-up does nothing.
         _dismissed = false;
         yield return null;
-        while (!_dismissed && !ClickedAnywhere()) yield return null;
+        while (!_dismissed) yield return null;
+
+        if (proceedButton != null) proceedButton.interactable = false;
+        SetPromptLive(false);
 
         if (clickLabel != null) clickLabel.DOKill();
         _sequence = Disappear();
@@ -352,40 +358,12 @@ public class VersusIntro : MonoBehaviour
         return view;
     }
 
-    /// <summary>The run's claimed milestone rewards that still shape the fight, one row each, stacked.</summary>
-    private void FillPlayerRows(Side side)
-    {
-        var listed = new List<MilestoneReward>();
-        var stacks = new List<int>();
-        if (GauntletRun.IsActive)
-            foreach (var milestone in GauntletRun.Milestones)
-            {
-                if (!milestone.Claimed || System.Array.IndexOf(LastingRewards, milestone.Reward) < 0) continue;
-
-                int at = listed.IndexOf(milestone.Reward);
-                if (at >= 0) stacks[at]++;
-                else
-                {
-                    listed.Add(milestone.Reward);
-                    stacks.Add(1);
-                }
-            }
-
-        side.rowCount = listed.Count;
-        if (side.list == null || blessingRowPrefab == null) return;
-
-        while (side.rows.Count < listed.Count)
-            side.rows.Add(Instantiate(blessingRowPrefab, side.list));
-
-        for (int i = 0; i < side.rows.Count; i++)
-        {
-            bool used = i < listed.Count;
-            side.rows[i].gameObject.SetActive(used);
-            if (used)
-                side.rows[i].Show(GauntletRun.MilestoneRewardName(listed[i]),
-                    GauntletRun.MilestoneRewardDescription(listed[i]), stacks[i]);
-        }
-    }
+    /// <summary>
+    /// The run's claimed milestone rewards that still shape the fight, one row each, stacked
+    /// (<see cref="GauntletPlayerBlessings"/>).
+    /// </summary>
+    private void FillPlayerRows(Side side) =>
+        side.rowCount = GauntletPlayerBlessings.Fill(side.list, blessingRowPrefab, side.rows);
 
     private void FillOpponentRows(Side side)
     {
@@ -515,6 +493,7 @@ public class VersusIntro : MonoBehaviour
 
         if (backdrop != null) SetAlpha(backdrop, 0f);
         if (clickLabel != null) clickLabel.alpha = 0f;
+        SetPromptLive(false);
     }
 
     private void PoseOffscreen(RectTransform rect, bool fromLeft)
@@ -575,26 +554,41 @@ public class VersusIntro : MonoBehaviour
         return sequence;
     }
 
+    /// <summary>
+    /// Whether the prompt can be reached by the pointer at all. Its group is authored shut -- the
+    /// game-over panel's draft opens it in code when it shows the prompt there -- so the match-up has to
+    /// open it here too, or the button sits under a group that refuses every ray and the hover never
+    /// fires either. Shut again as the match-up leaves, so an invisible prompt cannot eat a click.
+    /// </summary>
+    private void SetPromptLive(bool live)
+    {
+        if (clickLabel == null) return;
+
+        clickLabel.blocksRaycasts = live;
+        clickLabel.interactable = live;
+    }
+
     private void StartLabelPulse()
     {
         if (clickLabel == null) return;
 
         clickLabel.DOKill();
-        // The pulse is its own tween: DOTween won't loop forever inside a Sequence.
+        SetPromptLive(true);
+
+        // Dead until it is up, so the match-up cannot be dismissed by a click that lands while the
+        // button is still fading in.
+        if (proceedButton != null) proceedButton.interactable = false;
+
+        // Up once and stays up. No alpha pulse: the swords swinging are what says the button is live,
+        // and a pulse over the top of them only made the blades fade in and out as they swung.
         clickLabel.DOFade(1f, labelFadeDuration).OnComplete(() =>
-            clickLabel.DOFade(labelPulseAlpha, labelPulseDuration).SetEase(Ease.InOutSine)
-                .SetLoops(-1, LoopType.Yoyo));
+        {
+            if (proceedButton != null) proceedButton.interactable = true;
+        });
     }
 
     /// <summary>Sends the match-up away as a click would, once it has finished coming in.</summary>
     public void Dismiss() => _dismissed = true;
-
-    private static bool ClickedAnywhere()
-    {
-        if (EscMenuController.IsOpen) return false;
-        if (Input.GetMouseButtonDown(0)) return true;
-        return Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began;
-    }
 
     // ---------------------------------------------------------------- Disappear
 
@@ -863,6 +857,7 @@ public class VersusIntro : MonoBehaviour
             _sequence = null;
         }
         if (clickLabel != null) clickLabel.DOKill();
+        SetPromptLive(false);
     }
 
     private static void SetAlpha(Graphic graphic, float alpha)

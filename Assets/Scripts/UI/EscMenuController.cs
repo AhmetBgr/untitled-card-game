@@ -19,6 +19,13 @@ using UnityEngine.UI;
 /// Same problem <see cref="CardSelectionPanel"/> solves with a static bootstrap; an always-on parent is
 /// the cheaper answer here because this menu opens on a key rather than on an event.
 ///
+/// It stays available once the match is decided, over the end-of-match panel and the run's draft
+/// (<see cref="PopupManager"/>): a run has things to do from there that the panel itself does not offer --
+/// Abandon Run, the settings, the rules -- so the toggle is on screen for as long as the scene is. Opening
+/// the menu there takes that panel off the screen rather than stacking over it
+/// (<see cref="PopupManager.SetPopupHidden"/>), and Resume brings it back; it is faded, not switched off,
+/// so what it was still doing -- its score tally, its XP track -- is only frozen by the pause, not lost.
+///
 /// Pausing is <see cref="Time.timeScale"/> = 0, which is enough to freeze this particular game: every
 /// animation is either a DOTween tween (scaled time unless it opts out) or a coroutine yielding on
 /// WaitForSeconds, and the opponent's whole turn is one of those coroutines.
@@ -70,7 +77,6 @@ public class EscMenuController : MonoBehaviour
              "Tools ▸ Settings ▸ Rebuild Settings Panel.")]
     [SerializeField] private SettingsPanelController settingsPanel;
 
-
     [Header("On-screen toggle")]
     [Tooltip("Corner button that opens and closes the menu, for players who don't reach for Escape. It is " +
              "a SIBLING of the panel rather than a child of it, ordered after it — that is what keeps it " +
@@ -114,7 +120,6 @@ public class EscMenuController : MonoBehaviour
 
     /// <summary>Whether the rules and how-to-play panels are currently showing.</summary>
     private bool _infoOpen;
-
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void ResetState()
@@ -189,17 +194,6 @@ public class EscMenuController : MonoBehaviour
 
     private void Update()
     {
-        // The toggle is drawn above every other panel on this canvas, so it has to take ITSELF off screen
-        // once the match is decided — otherwise it floats over the end-game panel doing nothing when
-        // clicked, because Open refuses at that point. Re-checked per frame rather than hooked to an
-        // end-of-match event for the same reason BoardInteractionGate recomputes its gate: a predicate
-        // cannot get out of sync, a subscription can.
-        if (toggleButton != null)
-        {
-            bool show = IsOpen || !MatchIsOver();
-            if (toggleButton.gameObject.activeSelf != show) toggleButton.gameObject.SetActive(show);
-        }
-
         if (!Input.GetKeyDown(KeyCode.Escape)) return;
 
         // A confirmation popup over the menu owns Escape: it cancels the question, not the pause.
@@ -223,7 +217,6 @@ public class EscMenuController : MonoBehaviour
     public void Open()
     {
         if (IsOpen || panel == null) return;
-        if (MatchIsOver()) return;
 
         _resumeTimeScale = Time.timeScale;
         Time.timeScale = 0f;
@@ -233,6 +226,11 @@ public class EscMenuController : MonoBehaviour
         // Every pause starts on the buttons, whatever was left open last time.
         ShowInfo(false);
         ShowSettings(false);
+        RefreshAbandonRun();
+
+        // The end-of-match panel steps aside rather than being stacked under: it is a screen of its own,
+        // and a pause over the top of it would read as two at once. Resume brings it back.
+        if (PopupManager.Instance != null) PopupManager.Instance.SetPopupHidden(true);
 
         // Above everything else on the canvas, including a card selection panel left open mid-card. Done
         // on open rather than authored, because sibling order is a property of whatever else the scene has
@@ -250,8 +248,12 @@ public class EscMenuController : MonoBehaviour
         ShowSettings(false);
 
         // Guarded, so a Resume that closes nothing — OnDisable firing on an already-closed menu — cannot
-        // overwrite a timeScale somebody else owns.
-        if (IsOpen) Time.timeScale = _resumeTimeScale;
+        // overwrite a timeScale somebody else owns, or put back a panel it never took away.
+        if (IsOpen)
+        {
+            Time.timeScale = _resumeTimeScale;
+            if (PopupManager.Instance != null) PopupManager.Instance.SetPopupHidden(false);
+        }
 
         IsOpen = false;
         RefreshToggle();
@@ -310,9 +312,18 @@ public class EscMenuController : MonoBehaviour
 
     // ---------------------------------------------------------------- Abandon Run
 
+    /// <summary>A run that can still be thrown away: a finished one is already gone.</summary>
+    private static bool RunInProgress =>
+        GauntletRun.IsActive && GauntletRun.Outcome == GauntletRun.RunOutcome.InProgress;
+
+    /// <summary>
+    /// Builds the button and wires it, once. Whether it SHOWS is settled per open
+    /// (<see cref="RefreshAbandonRun"/>): the menu is reachable from the end-of-match panel now, where
+    /// the run may have ended since this ran.
+    /// </summary>
     private void SetUpAbandonRun()
     {
-        bool runInProgress = GauntletRun.IsActive && GauntletRun.Outcome == GauntletRun.RunOutcome.InProgress;
+        bool runInProgress = RunInProgress;
 
         if (abandonRunButton == null && runInProgress && mainMenuButton != null)
         {
@@ -331,6 +342,15 @@ public class EscMenuController : MonoBehaviour
         var label = abandonRunButton.GetComponentInChildren<TMPro.TMP_Text>(true);
         if (label != null) label.text = abandonRunLabel;
         abandonRunButton.onClick.AddListener(OnAbandonRunClicked);
+    }
+
+    /// <summary>
+    /// Shows or hides Abandon Run for this pause. Separate from <see cref="SetUpAbandonRun"/>, which must
+    /// not run twice -- it would add its click listener again.
+    /// </summary>
+    private void RefreshAbandonRun()
+    {
+        if (abandonRunButton != null) abandonRunButton.gameObject.SetActive(RunInProgress);
     }
 
     private void OnAbandonRunClicked() =>
@@ -365,17 +385,4 @@ public class EscMenuController : MonoBehaviour
             SceneManager.LoadScene(sceneName);
     }
 
-    /// <summary>
-    /// Whether the match has already been decided. The end-game panel is its own modal and already offers
-    /// Play Again / Proceed, so stacking a pause menu over it would only be a second way to leave a match
-    /// that is over. Checked on the state as well as the panel because the panel opens on a delay.
-    /// </summary>
-    private static bool MatchIsOver()
-    {
-        var gm = GameManager.Instance;
-        if (gm != null && gm.currentState == GameState.EndGame) return true;
-
-        var popup = PopupManager.Instance;
-        return popup != null && popup.HasOpenPopup;
-    }
 }

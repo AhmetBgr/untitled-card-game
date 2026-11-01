@@ -82,6 +82,65 @@ public static class PanelSlide
     }
 
     /// <summary>
+    /// How far down, in their parent's units, <paramref name="rects"/> (siblings, at their resting places)
+    /// must move for the top-most of them to sit <paramref name="margin"/> past the screen's bottom edge.
+    /// </summary>
+    public static float OffscreenBottomOffset(IReadOnlyList<RectTransform> rects, float margin)
+    {
+        if (rects == null || rects.Count == 0 || rects[0] == null) return 0f;
+
+        var parent = rects[0].parent;
+        var canvas = rects[0].GetComponentInParent<Canvas>(true)?.rootCanvas;
+        if (parent == null || canvas == null) return 0f;
+
+        ((RectTransform)canvas.transform).GetWorldCorners(Corners);
+        float screenBottom = parent.InverseTransformPoint(Corners[0]).y;
+
+        float top = float.MinValue;
+        foreach (var rect in rects)
+        {
+            if (rect == null) continue;
+
+            rect.GetWorldCorners(Corners);
+            top = Mathf.Max(top, parent.InverseTransformPoint(Corners[1]).y);
+        }
+
+        return screenBottom - top - margin;
+    }
+
+    /// <summary>
+    /// Each rect's turn in a bottom-to-top cascade, spread evenly from 0 (first) to 1 (last): by its
+    /// centre bottom to top, and left to right among rects level with each other. Hidden rects take no
+    /// turn (they get 0). What a stack of rows leaving by the bottom edge plays: the lowest goes first
+    /// and comes back last.
+    /// </summary>
+    public static float[] CascadeOrderUpward(IReadOnlyList<RectTransform> rects)
+    {
+        var centres = new Vector2[rects.Count];
+        var ranked = new List<int>();
+        for (int i = 0; i < rects.Count; i++)
+        {
+            if (rects[i] == null || !rects[i].gameObject.activeSelf) continue;
+
+            rects[i].GetWorldCorners(Corners);
+            centres[i] = (Corners[0] + Corners[2]) * 0.5f;
+            ranked.Add(i);
+        }
+
+        ranked.Sort((a, b) =>
+        {
+            int byY = centres[a].y.CompareTo(centres[b].y);
+            return byY != 0 ? byY : centres[a].x.CompareTo(centres[b].x);
+        });
+
+        int count = ranked.Count;
+        var order = new float[rects.Count];
+        for (int turn = 0; turn < count; turn++)
+            order[ranked[turn]] = count > 1 ? turn / (float)(count - 1) : 0f;
+        return order;
+    }
+
+    /// <summary>
     /// Each rect's turn in a left-to-right cascade, spread evenly from 0 (first) to 1 (last): by its
     /// centre left to right, and top to bottom among rects level with each other, so no two share a turn.
     /// Hidden rects take no turn (they get 0), so they leave no pause in it. <paramref name="rightToLeft"/>

@@ -42,6 +42,44 @@ public class PopupManager : Singleton<PopupManager>
     /// </summary>
     public bool HasOpenPopup => curPopup != null;
 
+    /// <summary>The popup is out of sight behind the pause menu, and what it looked like before it was.</summary>
+    private bool popupHidden;
+    private float popupAlpha = 1f;
+    private bool popupBlocked = true;
+
+    /// <summary>
+    /// Takes the open popup off the screen while something else owns it -- the pause menu
+    /// (<see cref="EscMenuController"/>), which is a screen of its own and not a thing to stack over the
+    /// end-of-match panel -- and puts it back on Resume.
+    ///
+    /// Faded rather than switched off, for the reason <see cref="BattleRewardsPanel"/> fades it too: the
+    /// panel is still tallying the battle's score and filling its XP track, and an inactive GameObject
+    /// would stop that dead halfway through. What it looked like is remembered rather than assumed, so
+    /// putting it back cannot reveal a panel something else had already hidden.
+    /// </summary>
+    public void SetPopupHidden(bool hidden)
+    {
+        if (curPopup == null) return;
+
+        var group = curPopup.GetComponent<CanvasGroup>();
+        if (group == null) return;
+
+        if (hidden == popupHidden) return;
+        popupHidden = hidden;
+
+        if (hidden)
+        {
+            popupAlpha = group.alpha;
+            popupBlocked = group.blocksRaycasts;
+            group.alpha = 0f;
+            group.blocksRaycasts = false;
+            return;
+        }
+
+        group.alpha = popupAlpha;
+        group.blocksRaycasts = popupBlocked;
+    }
+
     void Start()
     {
         if (replayButton != null) replayButton.onClick.AddListener(Replay);
@@ -221,6 +259,9 @@ public class PopupManager : Singleton<PopupManager>
         CloseCurPopup();
         curPopup = popup;
 
+        // A fresh popup is its own thing: whatever the last one was hiding behind has nothing to do with it.
+        popupHidden = false;
+
         curPopup.gameObject.SetActive(true);
 
         // Populate the end-game stats/score on this panel, if it has a view. Additive: does nothing on
@@ -269,6 +310,9 @@ public class PopupManager : Singleton<PopupManager>
     public void CloseCurPopup()
     {
         if (curPopup == null) return;
+
+        // Put back before it scales away, so the scale-out is something the player can see.
+        SetPopupHidden(false);
 
         var intro = curPopup.GetComponent<GameOverPanelIntro>();
         if (intro != null) intro.Stop();

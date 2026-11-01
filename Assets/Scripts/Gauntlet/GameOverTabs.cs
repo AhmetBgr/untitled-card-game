@@ -10,7 +10,8 @@ using UnityEngine;
 ///     the win paid out (<see cref="BattleRewardsPanel"/>);
 ///   * Draft -- the run's hero and deck as the rewards have left them;
 ///   * Statistics -- the run's stats, opening on the battle just fought;
-///   * Hero Info -- the run's hero and its drafted perks;
+///   * Hero Info -- the run's hero, its deck and the lasting milestone rewards it has claimed
+///     (<see cref="GameOverHeroInfo"/>);
 ///   * Battles -- the run's encounters, any of them picked off the battle track (<see cref="GameOverNextMatch"/>).
 ///
 /// The panel opens on <see cref="openOn"/>, with the bar itself dropping in from above the screen as the
@@ -19,6 +20,14 @@ using UnityEngine;
 /// brings the new one in behind it -- the same slide the Draft scene's own tabs make
 /// (<see cref="DraftSceneTabs"/>), down to the cascade that moves a panel's pieces one after another by
 /// their place left to right.
+///
+/// A tab marked fadeSwitch is the exception: every switch with that panel at either end cross-fades the
+/// two where they stand instead, quickly and without moving anything
+/// (<see cref="AddFadeSwitch"/>). That is the selection panel a reward pick puts up
+/// (<see cref="BattleRewardsPanel"/>) -- the slide's sweep across the screen says "somewhere else", and a
+/// pick's options just have to be there. It belongs to the panel rather than to the switch that reached
+/// it, so the panel comes and goes the same way whether a pick opened it, the reward was taken, or the
+/// player pressed a tab button to leave it.
 ///
 /// A tab marked keepAlive is parked off screen rather than switched off when another tab opens, because it
 /// is still doing something: the Result panel goes on tallying the battle's score and filling the XP track
@@ -61,14 +70,25 @@ public class GameOverTabs : MonoBehaviour
                  "running while another tab is up -- the Result panel, still tallying the battle.")]
         public bool keepAlive;
 
-        [Tooltip("Split the pieces in two: those listed in Right Side leave and come back by the right " +
-                 "edge, the rest by the left edge, each side cascading outer-most first out and last in.")]
+        [Tooltip("Come and go by a quick cross-fade where the panel stands, never by the slide -- " +
+                 "however the switch was reached, a tab button included. For the selection panel a " +
+                 "reward pick puts up: its options have to be there at once, and the slide's sweep " +
+                 "across the screen reads as the review being navigated, which a pick is not.")]
+        public bool fadeSwitch;
+
+        [Tooltip("Split the pieces by edge: those listed in Right Side leave and come back by the right " +
+                 "edge, those in Bottom Side by the bottom edge, the rest by the left edge, each side " +
+                 "cascading outer-most first out and last in.")]
         public bool splitSides;
 
         [Tooltip("With Split Sides on, the pieces that go right. Listed rather than worked out from where " +
                  "they sit: a piece's rect can reach well past what it shows (the rewards column's spans " +
                  "most of the screen).")]
         public RectTransform[] rightSide;
+
+        [Tooltip("With Split Sides on, the pieces that drop off the bottom edge and rise back in: the " +
+                 "Hero Info tab's blessings, under the hero and the deck that part to the sides.")]
+        public RectTransform[] bottomSide;
 
         [Tooltip("Faded out as the tab leaves and back in as it comes, outside the slide: the outcome " +
                  "title over Result.")]
@@ -113,6 +133,9 @@ public class GameOverTabs : MonoBehaviour
     [Tooltip("The Statistics panel's stats view, filled with the battle just fought. Optional.")]
     [SerializeField] private MatchStatsView lastMatchStats;
 
+    [Tooltip("The Hero Info panel, refreshed as its tab opens. Optional.")]
+    [SerializeField] private GameOverHeroInfo heroInfo;
+
     [Header("Slide")]
     [SerializeField] private float exitDuration = 0.5f;
     [SerializeField] private Ease exitEase = Ease.OutExpo;
@@ -124,6 +147,16 @@ public class GameOverTabs : MonoBehaviour
     [SerializeField] private float offscreenMargin = 50f;
     [Tooltip("Cascading tabs: how long after the first piece the last one starts moving.")]
     [SerializeField] private float cascadeSpread = 0.2f;
+
+    [Header("Fade switch")]
+    [Tooltip("A switch with a fadeSwitch tab at either end -- the selection panel a reward pick puts " +
+             "up -- instead of the slide: how long the open panel takes to fade out, and the new one to " +
+             "fade in. Short, but not so short it reads as a cut.")]
+    [SerializeField] private float fadeSwitchDuration = 0.18f;
+    [Tooltip("Pause between the open panel finishing its fade out and the new one starting to fade in. " +
+             "0 runs them back to back.")]
+    [SerializeField] private float fadeSwitchGap = 0f;
+    [SerializeField] private Ease fadeSwitchEase = Ease.Linear;
 
     private static GameOverTabs _instance;
 
@@ -188,11 +221,17 @@ public class GameOverTabs : MonoBehaviour
             _slide = null;
         }
 
-        // Put back wherever the slide had got to. Nothing is parked here: parking measures the screen's
-        // edge, and the next open poses everything again from scratch anyway.
+        // Put back wherever the slide had got to -- a fade switch's panels included, the kill above
+        // having skipped the callback that would have put them up. Nothing is parked here: parking
+        // measures the screen's edge, and the next open poses everything again from scratch anyway.
         if (tabs != null)
             foreach (var tab in tabs)
-                if (tab != null) Home(tab);
+            {
+                if (tab == null) continue;
+
+                Home(tab);
+                UnfadePanel(tab);
+            }
 
         StopEntrance();
     }
@@ -271,7 +310,7 @@ public class GameOverTabs : MonoBehaviour
             var slide = Measure(opening);
             for (int i = 0; i < opening.pieces.Length; i++)
                 if (opening.pieces[i] != null)
-                    opening.pieces[i].anchoredPosition = opening.homes[i] + new Vector2(slide.dx[i], 0f);
+                    opening.pieces[i].anchoredPosition = opening.homes[i] + slide.Offset(i);
 
             _slide = DOTween.Sequence();
             AddEnter(_slide, opening, slide, delay + panelEnterDelay, fade: false);
@@ -363,12 +402,39 @@ public class GameOverTabs : MonoBehaviour
 
         if (tab.panel != null)
         {
-            var group = tab.panel.GetComponent<CanvasGroup>();
-            if (group == null) group = tab.panel.AddComponent<CanvasGroup>();
+            var group = PanelGroup(tab);
+            group.DOKill();
             group.alpha = covered ? 0f : 1f;
             group.blocksRaycasts = !covered;
         }
         SetFaded(tab, !covered);
+    }
+
+    /// <summary>
+    /// A panel's own CanvasGroup, added on demand: what a fade switch fades it by, and what a cover
+    /// hides it behind.
+    /// </summary>
+    private static CanvasGroup PanelGroup(Tab tab)
+    {
+        var group = tab.panel.GetComponent<CanvasGroup>();
+        if (group == null) group = tab.panel.AddComponent<CanvasGroup>();
+        return group;
+    }
+
+    /// <summary>
+    /// Puts a panel's own fade back fully up, where a switch has given it one. Nothing is added here: a
+    /// panel that has never been faded has no group to put back, and does not need one.
+    /// </summary>
+    private static void UnfadePanel(Tab tab)
+    {
+        if (tab?.panel == null) return;
+
+        var group = tab.panel.GetComponent<CanvasGroup>();
+        if (group == null) return;
+
+        group.DOKill();
+        group.alpha = 1f;
+        group.blocksRaycasts = true;
     }
 
     /// <summary>
@@ -406,7 +472,11 @@ public class GameOverTabs : MonoBehaviour
         RefreshButtons();
     }
 
-    /// <summary>Opens <paramref name="kind"/>'s panel, sliding the open one out first when animated.</summary>
+    /// <summary>
+    /// Opens <paramref name="kind"/>'s panel, sliding the open one out first when animated -- or
+    /// cross-fading the two where they stand, when either end of the switch is a tab marked
+    /// <see cref="Tab.fadeSwitch"/> (<see cref="AddFadeSwitch"/>).
+    /// </summary>
     public void Select(TabKind kind, bool animate)
     {
         Init();
@@ -430,6 +500,17 @@ public class GameOverTabs : MonoBehaviour
         }
 
         _slide = DOTween.Sequence();
+
+        // Either end of the switch being a fading panel makes the whole switch a fade: the two halves
+        // cannot be a slide and a fade at once, and the panel that asked for the fade is the one whose
+        // coming or going the player is watching.
+        if ((from != null && from.fadeSwitch) || to.fadeSwitch)
+        {
+            AddFadeSwitch(from, to);
+            _slide.OnKill(() => _slide = null);
+            return;
+        }
+
         float enterAt = enterGap;
 
         if (from != null && from.panel != null && from.panel.activeSelf && from.pieces.Length > 0)
@@ -452,32 +533,101 @@ public class GameOverTabs : MonoBehaviour
             Home(to);
             var slide = Measure(to);
             for (int i = 0; i < to.pieces.Length; i++)
-                to.pieces[i].anchoredPosition = to.homes[i] + new Vector2(slide.dx[i], 0f);
+                to.pieces[i].anchoredPosition = to.homes[i] + slide.Offset(i);
             AddEnter(_slide, to, slide, enterAt);
         }
 
         _slide.OnKill(() => _slide = null);
     }
 
+    /// <summary>
+    /// Switches by fading rather than sliding: the open panel fades out where it stands, the new one
+    /// fades in in its place, and nothing moves. What a reward pick opens and closes on -- the options
+    /// have to be there at once, and the cascade's sweep across the screen reads as the review being
+    /// navigated, which taking a reward is not.
+    ///
+    /// The leaving panel is parked once it is out of sight, exactly as the sliding switch parks it, and
+    /// its fade is then put back up: off screen or switched off, full alpha shows nothing, and the next
+    /// switch finds the panel as it expects it.
+    /// </summary>
+    private void AddFadeSwitch(Tab from, Tab to)
+    {
+        float enterAt = 0f;
+
+        // No piece has to move for this, so -- unlike the sliding switch -- a panel with nothing
+        // collected under it still fades out and is still parked.
+        if (from != null && from.panel != null && from.panel.activeSelf)
+        {
+            // A slide inside the panel (its fight tabs) ends first, the way the sliding switch ends it.
+            DOTween.Complete(from.panel.transform, withCallbacks: true);
+
+            var leaving = PanelGroup(from);
+            leaving.DOKill();
+            leaving.blocksRaycasts = false;
+            _slide.Insert(0f, leaving.DOFade(0f, fadeSwitchDuration).SetEase(fadeSwitchEase));
+
+            // What fades with the panel but sits outside it -- the outcome title over Result.
+            foreach (var group in FadeGroups(from))
+                _slide.Insert(0f, group.DOFade(0f, fadeSwitchDuration).SetEase(fadeSwitchEase));
+
+            var parked = from;
+            _slide.InsertCallback(fadeSwitchDuration, () =>
+            {
+                Park(parked);
+                PanelGroup(parked).alpha = 1f;
+            });
+
+            enterAt = fadeSwitchDuration + fadeSwitchGap;
+        }
+
+        if (to.panel == null) return;
+
+        to.panel.SetActive(true);
+        to.parked = false;
+
+        // Measured from nothing: a fade switch leaves every piece where it rests, so a parked panel is
+        // only put back home.
+        Home(to);
+
+        var arriving = PanelGroup(to);
+        arriving.DOKill();
+        arriving.alpha = 0f;
+        arriving.blocksRaycasts = false;
+        _slide.Insert(enterAt, arriving.DOFade(1f, fadeSwitchDuration).SetEase(fadeSwitchEase));
+        _slide.InsertCallback(enterAt + fadeSwitchDuration, () => arriving.blocksRaycasts = true);
+
+        foreach (var group in FadeGroups(to))
+        {
+            group.alpha = 0f;
+            _slide.Insert(enterAt, group.DOFade(1f, fadeSwitchDuration).SetEase(fadeSwitchEase));
+        }
+    }
+
     /// <summary>Where each of a tab's pieces goes when it leaves, and its turn in the cascade.</summary>
     private struct SlidePlan
     {
-        /// <summary>How far each piece moves, measured from home: negative off the left edge, positive off the right.</summary>
+        /// <summary>How far each piece moves sideways, measured from home: negative off the left edge, positive off the right.</summary>
         public float[] dx;
+
+        /// <summary>How far each piece moves down, measured from home: negative off the bottom edge; 0 for a piece going sideways.</summary>
+        public float[] dy;
 
         /// <summary>Each piece's turn leaving, 0 first to 1 last; coming back runs the other way round.</summary>
         public float[] turn;
+
+        /// <summary>Where piece <paramref name="i"/> waits off screen, relative to its home.</summary>
+        public Vector2 Offset(int i) => new Vector2(dx[i], dy[i]);
     }
 
     /// <summary>
     /// Plans <paramref name="tab"/>'s slide, with its pieces at home. All of them go left, the right-most
-    /// last; a split tab sends its Right Side pieces right and the rest left, each side's outer-most
-    /// piece first.
+    /// last; a split tab sends its Right Side pieces right, its Bottom Side pieces down and the rest
+    /// left, each side's outer-most piece first.
     /// </summary>
     private SlidePlan Measure(Tab tab)
     {
         int count = tab.pieces.Length;
-        var plan = new SlidePlan { dx = new float[count], turn = new float[count] };
+        var plan = new SlidePlan { dx = new float[count], dy = new float[count], turn = new float[count] };
         if (count == 0) return plan;
 
         if (!tab.splitSides)
@@ -494,19 +644,38 @@ public class GameOverTabs : MonoBehaviour
 
         var left = new List<int>();
         var right = new List<int>();
+        var bottom = new List<int>();
         for (int i = 0; i < count; i++)
         {
             // A hidden piece has nowhere to go, and its rect must not stretch the distance the rest travel.
             var piece = tab.pieces[i];
             if (piece == null || !piece.gameObject.activeSelf) continue;
 
-            bool goesRight = tab.rightSide != null && System.Array.IndexOf(tab.rightSide, piece) >= 0;
-            (goesRight ? right : left).Add(i);
+            if (tab.bottomSide != null && System.Array.IndexOf(tab.bottomSide, piece) >= 0) bottom.Add(i);
+            else if (tab.rightSide != null && System.Array.IndexOf(tab.rightSide, piece) >= 0) right.Add(i);
+            else left.Add(i);
         }
 
         Side(left, rightToLeft: false);
         Side(right, rightToLeft: true);
+        Bottom(bottom);
         return plan;
+
+        void Bottom(List<int> indices)
+        {
+            if (indices.Count == 0) return;
+
+            var rects = new List<RectTransform>(indices.Count);
+            foreach (int i in indices) rects.Add(tab.pieces[i]);
+
+            float dy = PanelSlide.OffscreenBottomOffset(rects, offscreenMargin);
+            var order = PanelSlide.CascadeOrderUpward(rects);
+            for (int k = 0; k < indices.Count; k++)
+            {
+                plan.dy[indices[k]] = dy;
+                plan.turn[indices[k]] = order[k];
+            }
+        }
 
         void Side(List<int> indices, bool rightToLeft)
         {
@@ -534,7 +703,7 @@ public class GameOverTabs : MonoBehaviour
         for (int i = 0; i < tab.pieces.Length; i++)
             if (tab.pieces[i] != null)
                 sequence.Insert(at + spread * plan.turn[i],
-                    tab.pieces[i].DOAnchorPos(tab.homes[i] + new Vector2(plan.dx[i], 0f), exitDuration).SetEase(exitEase));
+                    tab.pieces[i].DOAnchorPos(tab.homes[i] + plan.Offset(i), exitDuration).SetEase(exitEase));
 
         foreach (var group in FadeGroups(tab))
             sequence.Insert(at, group.DOFade(0f, exitDuration).SetEase(exitEase));
@@ -609,6 +778,9 @@ public class GameOverTabs : MonoBehaviour
                 tab.parked = false;
                 Home(tab);
                 SetFaded(tab, true);
+
+                // A fade switch cut short can leave the panel part way down; it is up now.
+                if (!_covered) UnfadePanel(tab);
             }
             else Park(tab);
         }
@@ -637,7 +809,7 @@ public class GameOverTabs : MonoBehaviour
 
         var plan = Measure(tab);
         for (int i = 0; i < tab.pieces.Length; i++)
-            if (tab.pieces[i] != null) tab.pieces[i].anchoredPosition = tab.homes[i] + new Vector2(plan.dx[i], 0f);
+            if (tab.pieces[i] != null) tab.pieces[i].anchoredPosition = tab.homes[i] + plan.Offset(i);
 
         tab.parked = true;
     }
@@ -662,6 +834,12 @@ public class GameOverTabs : MonoBehaviour
         if (kind == TabKind.Battles)
         {
             if (battles != null) battles.Refresh();
+            return;
+        }
+
+        if (kind == TabKind.HeroInfo)
+        {
+            if (heroInfo != null) heroInfo.Refresh();
             return;
         }
 

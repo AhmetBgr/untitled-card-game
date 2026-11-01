@@ -484,6 +484,19 @@ public class CardSelectionPanel : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// While set, <see cref="Close"/> clears the options but leaves the panel's object on, because
+    /// something around it is fading it away: the end-of-match tab a reward pick sits on, whose fade
+    /// switch takes the whole tab out (<see cref="GameOverTabs"/>). The panel closes before the reward is
+    /// marked taken and the tab is switched (<see cref="CardChoice.TryResolveClick"/> ends the request
+    /// first), so switching off here would snap it away a frame before that fade even started, leaving
+    /// only the loadout beside it to be seen fading.
+    ///
+    /// Whoever sets it owns clearing it and owns putting the panel away -- which for a tab is the park at
+    /// the end of the switch (<see cref="BattleRewardsPanel"/>).
+    /// </summary>
+    public bool KeepOnClose { get; set; }
+
     /// <summary>Clear the options and hide the panel again.</summary>
     public void Close()
     {
@@ -494,7 +507,7 @@ public class CardSelectionPanel : MonoBehaviour
         _peeking = false;
         ApplyPeekState();
 
-        gameObject.SetActive(false);
+        if (!KeepOnClose) gameObject.SetActive(false);
     }
 
     /// <summary>
