@@ -132,6 +132,9 @@ public class EnemySave
     public List<string> ownPassives = new List<string>();
     public List<string> extraPassives = new List<string>();
     public string startingMinion;
+
+    /// <summary>The battle's weather, by asset name; empty for a clear sky (or a save from before weather).</summary>
+    public string weather;
 }
 
 [Serializable]

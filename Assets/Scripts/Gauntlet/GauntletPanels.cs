@@ -274,8 +274,15 @@ public static class GauntletNextMatch
         rulesText.enableAutoSizing = true;
         rulesText.fontSizeMax = rulesFontSize;
         rulesText.fontSizeMin = rulesFontSize * 0.6f;
-        rulesText.text = BlessingRules(enemy.Blessings);
+        rulesText.text = BlessingRules(enemy.Blessings) + WeatherRule(enemy.Weather);
     }
+
+    /// <summary>How a weather is named on a fight briefing.</summary>
+    public static string WeatherLabel(WeatherSO weather) => $"Weather: {weather.DisplayName}";
+
+    /// <summary>The fight's weather as one more rules line, or nothing for a clear sky.</summary>
+    public static string WeatherRule(WeatherSO weather) =>
+        weather == null ? string.Empty : $"<color=#FFD36B>{WeatherLabel(weather)}</color>: {weather.description}\n";
 
     /// <summary>
     /// The enemy's blessings under one header, one line each; stacked ones (Extra Passive) once, with a count.

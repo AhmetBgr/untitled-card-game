@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d4fd77fda82410c4dae7ef9a5f4a0f14, type: 3}
+  m_Name: Weather_Thunder
+  m_EditorClassIdentifier: Assembly-CSharp::SoundEffect
+  clips:
+  - {fileID: 8300000, guid: b1097ea92a37bfc4385a1b13f4d10e53, type: 3}
+  bus: 0
+  playOrder: 1
+  volume: 0.75
+  useRandomVolume: 0
+  volumeRandom: {x: 0.85, y: 1}
+  pitch: 1
+  useRandomPitch: 1
+  pitchRandom: {x: 0.92, y: 1.05}
+  loop: 0
+  delay: 0
+  fadeOut: 0
+  fadeOutDuration: 0.08
+  spatialBlend: 0
+  priority: 64
+  minRetriggerInterval: 0.2
+  maxConcurrent: 2
+  stackVolumeFalloff: 0.75

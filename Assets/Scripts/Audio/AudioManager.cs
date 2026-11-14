@@ -96,6 +96,12 @@ public class AudioManager : MonoBehaviour
 
     private readonly Bed[] _ambience = CreateAmbienceBeds();
 
+    /// <summary>
+    /// The battle's weather bed (rain, wind...), on top of the room's layers rather than replacing one,
+    /// so the room tone keeps going underneath. Same Ambient bus, so the ambience slider covers it too.
+    /// </summary>
+    private readonly Bed _weatherAmbience = new Bed("Ambience Weather", AudioBus.Ambient);
+
     private static Bed[] CreateAmbienceBeds()
     {
         var beds = new Bed[AmbienceLayers];
@@ -228,6 +234,7 @@ public class AudioManager : MonoBehaviour
     {
         ApplyBedVolume(_music);
         foreach (Bed layer in _ambience) ApplyBedVolume(layer);
+        ApplyBedVolume(_weatherAmbience);
     }
 
     /// <summary>
@@ -564,10 +571,17 @@ public class AudioManager : MonoBehaviour
         StopBed(_ambience[layer], fadeDuration);
     }
 
-    /// <summary>Stops every ambience layer.</summary>
+    /// <summary>Plays a weather bed over the room's ambience layers (which keep playing).</summary>
+    public void PlayWeatherAmbience(SoundEffect ambience, float fadeDuration = 3f) =>
+        PlayBed(_weatherAmbience, ambience, fadeDuration);
+
+    public void StopWeatherAmbience(float fadeDuration = 3f) => StopBed(_weatherAmbience, fadeDuration);
+
+    /// <summary>Stops every ambience layer, the weather bed included.</summary>
     public void StopAllAmbience(float fadeDuration = 3f)
     {
         foreach (Bed layer in _ambience) StopBed(layer, fadeDuration);
+        StopBed(_weatherAmbience, fadeDuration);
     }
 
     private void PlayBed(Bed bed, SoundEffect sound, float fadeDuration)

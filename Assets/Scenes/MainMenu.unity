@@ -6654,9 +6654,9 @@ MonoBehaviour:
     description: Choose the deck and the hero for both sides yourself before the
       match starts.
   - button: {fileID: 1220182893}
-    description: Pick a hero and draft a 5-card deck, then battle three enemies
-      in a row. Your hero's wounds and buffs carry over, and every victory adds
-      new cards to your deck.
+    description: Pick a hero and draft a 5-card deck, then battle three enemies in
+      a row. Your hero's wounds and buffs carry over, and every victory adds new
+      cards to your deck.
 --- !u!114 &1510087815
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8307,6 +8307,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UITooltip
   label: {fileID: 353960465}
   gap: 12
+  background: {fileID: 0}
 --- !u!114 &1740817010
 MonoBehaviour:
   m_ObjectHideFlags: 0

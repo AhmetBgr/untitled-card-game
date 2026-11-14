@@ -325,7 +325,7 @@ public class MinionController : MonoBehaviour
         MinionController attacker = selection.ActiveAttacker;
         if (attacker != null)
         {
-            int dmgToTarget = Mathf.Max(attacker.modal.attack - modal.armor, 0);
+            int dmgToTarget = Mathf.Max(WeatherSystem.ModifyDamage(attacker.modal.attack) - modal.armor, 0);
             bool targetDies = dmgToTarget >= modal.health;
             SetSkull(targetDies);
             // Non-lethal hit: preview the health the target will lose (the skull owns the lethal case).
@@ -335,7 +335,7 @@ public class MinionController : MonoBehaviour
             // (mirrors Attack()'s RangeUtility.IsInRange(target, attacker) check).
             if (RangeUtility.IsInRange(this, attacker))
             {
-                int dmgToAttacker = Mathf.Max(modal.attack - attacker.modal.armor, 0);
+                int dmgToAttacker = Mathf.Max(WeatherSystem.ModifyDamage(modal.attack) - attacker.modal.armor, 0);
                 bool attackerDies = dmgToAttacker >= attacker.modal.health;
                 attacker.SetSkull(attackerDies);
                 attacker.SetHealthChangePreview(attackerDies ? 0 : -dmgToAttacker);
@@ -382,7 +382,7 @@ public class MinionController : MonoBehaviour
         CardEffectInspector.StatDelta delta = CardEffectInspector.GetTargetedStatChange(card);
         int dA = delta.attack;
         int dH = delta.health;
-        if (dH < 0) dH = -Mathf.Max(-dH - modal.armor, 0); // a health debuff is reduced by armor, like damage
+        if (dH < 0) dH = -Mathf.Max(WeatherSystem.ModifyDamage(-dH) - modal.armor, 0); // weather + armor, like damage
 
         if (dA == 0 && dH == 0) { HideStatChange(); return; }
 
@@ -539,7 +539,7 @@ public class MinionController : MonoBehaviour
         int damage = CardEffectInspector.GetTargetedDamage(sourceCard);
         if (damage <= 0) return false;
 
-        int effectiveDamage = Mathf.Max(damage - modal.armor, 0);
+        int effectiveDamage = Mathf.Max(WeatherSystem.ModifyDamage(damage) - modal.armor, 0);
         return effectiveDamage >= modal.health;
     }
 
@@ -875,6 +875,8 @@ public class MinionController : MonoBehaviour
     /// </param>
     public bool TakeDamage(int damage, DamageSource source = DamageSource.Effect)
     {
+        // Weather scales the raw hit before armor (Blood Moon doubles it).
+        damage = WeatherSystem.ModifyDamage(damage);
         int effectiveDamage = Mathf.Max(damage - modal.armor, 0);
         modal.health -= effectiveDamage;
 
@@ -1051,6 +1053,9 @@ public class MinionController : MonoBehaviour
         transform.DOMove(pos, 0.25f).OnComplete(() =>
         {
             if (GameManager.Instance != null) GameManager.Instance.SetPlayerMinionsReadyToAttack();
+            // Landed: the weather sees it arrive (the Overgrowth brambles bite here). Skipped if another
+            // move has since sent it on, so only the cell it actually stopped on counts.
+            if (Vector3Int.RoundToInt(gridEntity.WorldPos) == pos) WeatherSystem.NotifyMinionEnteredCell(this);
         });
         plannedMoveDir = Vector3Int.zero;
         isMovementValidated = false;
@@ -1091,8 +1096,9 @@ public class MinionController : MonoBehaviour
         transform.DOMove(posB, 0.25f).OnComplete(() =>
         {
             if (GameManager.Instance != null) GameManager.Instance.SetPlayerMinionsReadyToAttack();
+            WeatherSystem.NotifyMinionEnteredCell(this);
         });
-        other.transform.DOMove(posA, 0.25f);
+        other.transform.DOMove(posA, 0.25f).OnComplete(() => WeatherSystem.NotifyMinionEnteredCell(other));
 
         plannedMoveDir = Vector3Int.zero;
         other.plannedMoveDir = Vector3Int.zero;

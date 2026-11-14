@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb333edb701587a4ea6b57d4b0b30ea3, type: 3}
+  m_Name: WeatherDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::WeatherDatabaseSO
+  weathers:
+  - {fileID: 11400000, guid: e1c48616d9cab0849b2337b7bb363baf, type: 2}
+  - {fileID: 11400000, guid: 4d8978c4f99a86445a7f107b332a8b49, type: 2}
+  - {fileID: 11400000, guid: e2745f138e8142f43b1842c6a67af28c, type: 2}
+  - {fileID: 11400000, guid: 05844f5a5ed387a41acafb5a9243404b, type: 2}
+  - {fileID: 11400000, guid: 35b09f79d85191c4ea75f86cbf0f2d3a, type: 2}
+  - {fileID: 11400000, guid: 97f524939af61404a97058cc9b74c366, type: 2}
+  - {fileID: 11400000, guid: 723055be41339f74786acaf3f59367dc, type: 2}
+  - {fileID: 11400000, guid: 7965f9cb63e6e0543b7d6032d5c32d69, type: 2}
+  - {fileID: 11400000, guid: f5b3fa0e3baba8d46896051c396daf27, type: 2}
+  - {fileID: 11400000, guid: 84c7ed0798bb2a549abbfd3fdd27157b, type: 2}
+  forceWeatherOutsideRuns: {fileID: 0}
+  randomWeatherOutsideRuns: 0
+  tileMarkerOrderOffset: 1
+  tileMarkerAlpha: 0.85
+  hudAnchor: {x: 0, y: 1}
+  hudOffset: {x: 24, y: -190}
+  hudIconSize: 72
+  hudWidth: 320
+  hudNameFontSize: 30
+  hudTextFontSize: 20
+  hudNameColor: {r: 1, g: 0.83, b: 0.42, a: 1}
+  hudTextColor: {r: 1, g: 1, b: 1, a: 1}
+  hudBackgroundColor: {r: 0, g: 0, b: 0, a: 0.55}

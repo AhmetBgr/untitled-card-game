@@ -119,6 +119,22 @@ public static class MatchModifiers
     /// </summary>
     public const int MaxExtraPassives = 2;
 
+    /// <summary>
+    /// True when the mode has a modifier that picks the weather; <paramref name="weather"/> is its pick
+    /// (null = clear sky). False with no mode, or a mode without one: the caller's own default applies.
+    /// </summary>
+    public static bool TryChooseWeather(out WeatherSO weather)
+    {
+        weather = null;
+        if (Mode == null) return false;
+
+        List<GameModifierSO> modifiers = Mode.modifiers;
+        for (int i = 0; i < modifiers.Count; i++)
+            if (modifiers[i] != null && modifiers[i].TryChooseWeather(GetValue(modifiers[i]), out weather)) return true;
+
+        return false;
+    }
+
     public static bool ExtraPassivesEnabled
     {
         get

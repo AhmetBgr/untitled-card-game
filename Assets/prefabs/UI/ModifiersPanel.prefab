@@ -92,8 +92,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ModifiersPopupController
   panel: {fileID: 2623983520006854725}
-  window: {fileID: 7237084874754726691}
-  popDuration: 0.2
   columns:
   - {fileID: 3332132938676345468}
   - {fileID: 4696040864491751632}
@@ -101,6 +99,8 @@ MonoBehaviour:
   toggleRowPrefab: {fileID: 6458731433504632092, guid: 475aa7c63b7ff0d47942a9a3f4db4fdd,
     type: 3}
   sliderRowPrefab: {fileID: 2998292654944200882, guid: cca89201e5230c34888b491238ca0743,
+    type: 3}
+  weatherRowPrefab: {fileID: 2412917374384762826, guid: ef0a4739b4bce604db695f309a096397,
     type: 3}
   titleLabel: {fileID: 1864055840609463366}
   resetButton: {fileID: 2404159600004486263}

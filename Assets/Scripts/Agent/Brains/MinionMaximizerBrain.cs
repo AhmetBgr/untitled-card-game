@@ -44,7 +44,7 @@ public class MinionMaximizerBrain : AgentBrain
     public override float ScoreAttack(MinionController attacker, MinionController target, Agent self)
     {
         bool isHero = target == GameManager.Instance.player.hero;
-        int effectiveDamage = Mathf.Max(attacker.modal.attack - target.modal.armor, 0);
+        int effectiveDamage = Mathf.Max(WeatherSystem.ModifyDamage(attacker.modal.attack) - target.modal.armor, 0);
         bool willKill = target.modal.health - effectiveDamage <= 0;
 
         float score = willKill ? killPenalty : chipDamageBonus;

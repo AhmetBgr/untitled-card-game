@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2b0b7e07413c44c42a2ae1125eee4066, type: 3}
+  m_Name: BloodMoon
+  m_EditorClassIdentifier: Assembly-CSharp::DamageMultiplierWeatherSO
+  weatherName: Blood Moon
+  description: All damage is doubled.
+  icon: {fileID: 0}
+  tileSprite: {fileID: 0}
+  tileTint: {r: 1, g: 1, b: 1, a: 1}
+  visualPrefab: {fileID: 3405643933137007273, guid: 02a3f06521b342644afe2022dbe9cb2d,
+    type: 3}
+  inRandomPool: 1
+  multiplier: 2

@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 382aed924b1853d40aa6fcfb22970705, type: 3}
+  m_Name: Fog
+  m_EditorClassIdentifier: Assembly-CSharp::FogWeatherSO
+  weatherName: Fog
+  description: A random column is covered in fog. Minions in the fog have -1 Attack.
+  icon: {fileID: 0}
+  tileSprite: {fileID: 0}
+  tileTint: {r: 0.85, g: 0.9, b: 0.95, a: 0.4}
+  visualPrefab: {fileID: 7800382237811944522, guid: 002caff4c3af04c4f8dc6bcca25c2563,
+    type: 3}
+  inRandomPool: 1
+  attackPenalty: 1

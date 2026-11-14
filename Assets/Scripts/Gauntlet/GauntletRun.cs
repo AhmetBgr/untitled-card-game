@@ -49,6 +49,7 @@ public static class GauntletRun
         public readonly List<HeroPassiveSO> ownPassives = new List<HeroPassiveSO>();
         public readonly List<HeroPassiveSO> extraPassives = new List<HeroPassiveSO>();
         public CardSO startingMinion;
+        public WeatherSO weather;
     }
 
     /// <summary>One milestone of this run's track, with its Random reward already rolled.</summary>
@@ -197,6 +198,7 @@ public static class GauntletRun
     private static readonly List<HeroPassiveSO> _enemyOwnPassives = new List<HeroPassiveSO>();
     private static readonly List<HeroPassiveSO> _enemyExtraPassives = new List<HeroPassiveSO>();
     private static CardSO _enemyStartingMinion;
+    private static WeatherSO _enemyWeather;
 
     /// <summary>Stronger Minions: enemy summons still owed the buff this battle.</summary>
     private static int _strongerMinionsLeft;
@@ -274,6 +276,12 @@ public static class GauntletRun
     /// <summary>The minion the next enemy starts with on the board (Starting Minion), or null.</summary>
     public static CardSO EnemyStartingMinion => _enemyStartingMinion;
 
+    /// <summary>
+    /// The weather the next battle is fought in, rolled with its enemy (<see cref="WeatherDatabaseSO"/>).
+    /// Null outside a run, or for a run saved before weather existed.
+    /// </summary>
+    public static WeatherSO CurrentWeather => IsActive ? _enemyWeather : null;
+
     /// <summary>Enemy hero health after the encounter's multiplier and Bonus Health.</summary>
     public static int EnemyStartingHealth(int printedHealth)
     {
@@ -293,6 +301,7 @@ public static class GauntletRun
         public HeroSO Hero { get; internal set; }
         public IReadOnlyList<GauntletBlessing> Blessings { get; internal set; }
         public List<HeroPassiveSO> Passives { get; internal set; }
+        public WeatherSO Weather { get; internal set; }
 
         /// <summary>Enemy hero health after this encounter's multiplier and Bonus Health.</summary>
         public int StartingHealth { get; internal set; }
@@ -317,6 +326,7 @@ public static class GauntletRun
             Hero = roll.hero,
             Blessings = roll.blessings,
             Passives = passives,
+            Weather = roll.weather,
             StartingHealth = hp,
         };
     }
@@ -385,6 +395,7 @@ public static class GauntletRun
         _enemyOwnPassives.Clear();
         _enemyExtraPassives.Clear();
         _enemyStartingMinion = null;
+        _enemyWeather = null;
         StopStrongerMinions();
     }
 
@@ -483,6 +494,19 @@ public static class GauntletRun
     {
         if (!IsActive || RestoreResultsPending) return null;
         return RunRandom.Derive(_seed, EncounterIndex, (int)side);
+    }
+
+    /// <summary>
+    /// Seed for the battle's weather rolls (bramble tiles, fog column, meteor spots, wind direction), so a
+    /// fight walked out of and restarted is laid out the same. Null outside a run.
+    /// </summary>
+    public static int? BattleWeatherSeed
+    {
+        get
+        {
+            if (!IsActive || RestoreResultsPending) return null;
+            return RunRandom.Derive(_seed, EncounterIndex, 0x5745);
+        }
     }
 
     /// <summary>
@@ -927,7 +951,7 @@ public static class GauntletRun
     /// <summary>The enemy just rolled into the live fields, copied out.</summary>
     private static EnemyRoll TakeRolledEnemy()
     {
-        var roll = new EnemyRoll { hero = _enemyHero, startingMinion = _enemyStartingMinion };
+        var roll = new EnemyRoll { hero = _enemyHero, startingMinion = _enemyStartingMinion, weather = _enemyWeather };
         roll.deck.AddRange(_enemyDeck);
         roll.blessings.AddRange(_enemyBlessings);
         roll.ownPassives.AddRange(_enemyOwnPassives);
@@ -942,6 +966,7 @@ public static class GauntletRun
 
         _enemyHero = roll.hero;
         _enemyStartingMinion = roll.startingMinion;
+        _enemyWeather = roll.weather;
         _enemyDeck.AddRange(roll.deck);
         _enemyBlessings.AddRange(roll.blessings);
         _enemyOwnPassives.AddRange(roll.ownPassives);
@@ -981,6 +1006,10 @@ public static class GauntletRun
         _enemyDeck.AddRange(HasEnemyBlessing(GauntletBlessing.UpgradedDeck)
             ? GenerateEnemyDeck(Config.upgradedDeckSize, UpgradedCardPool(), UpgradedManaCurve, UpgradedManaCurveSize, allowDuplicates: true)
             : GenerateEnemyDeck(encounter.enemyDeckSize, BaseCardPool(), DeckSO.ManaCurve, 10, allowDuplicates: false));
+
+        // Rolled last so adding weather left every earlier roll of the stream where it was.
+        var weathers = WeatherDatabaseSO.Load().Pool();
+        _enemyWeather = weathers.Count > 0 ? weathers[Rng.Range(0, weathers.Count)] : null;
     }
 
     // ---------------------------------------------------------------- Blessings
@@ -1564,6 +1593,7 @@ public static class GauntletRun
                 ownPassives = PassiveKeys(enemy.ownPassives),
                 extraPassives = PassiveKeys(enemy.extraPassives),
                 startingMinion = CardKey(enemy.startingMinion),
+                weather = enemy.weather != null ? enemy.weather.name : null,
             };
             foreach (var blessing in enemy.blessings) save.blessings.Add(blessing.ToString());
             data.enemies.Add(save);
@@ -1719,7 +1749,13 @@ public static class GauntletRun
 
         foreach (var save in data.enemies)
         {
-            var enemy = new EnemyRoll { hero = HeroOf(save.hero), startingMinion = Card(save.startingMinion) };
+            // A missing or since-removed weather just means a clear sky: not worth discarding the run over.
+            var enemy = new EnemyRoll
+            {
+                hero = HeroOf(save.hero),
+                startingMinion = Card(save.startingMinion),
+                weather = WeatherDatabaseSO.Load().GetByName(save.weather),
+            };
             Cards(save.deck, enemy.deck);
             foreach (var blessing in save.blessings) enemy.blessings.Add(Enum<GauntletBlessing>(blessing));
             Passives(save.ownPassives, enemy.ownPassives);

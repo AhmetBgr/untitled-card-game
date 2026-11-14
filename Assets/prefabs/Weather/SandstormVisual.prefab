@@ -1,0 +1,275 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &353610172972491582
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1948780660925741681}
+  - component: {fileID: 6465783644259118957}
+  - component: {fileID: 6845145002265943040}
+  - component: {fileID: 5314118226282637058}
+  m_Layer: 0
+  m_Name: Fog2D
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!4 &1948780660925741681
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 353610172972491582}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 8637944718697071682}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!33 &6465783644259118957
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 353610172972491582}
+  m_Mesh: {fileID: 0}
+--- !u!23 &6845145002265943040
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 353610172972491582}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 35267f02c1e93584b810e36300f816f8, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: -44025399
+  m_SortingLayer: 2
+  m_SortingOrder: 50
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &5314118226282637058
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 353610172972491582}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 303e640b83d68da469318e8819e14511, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Fog2DController
+  targetCamera: {fileID: 0}
+  followCamera: 1
+  overscan: 1.1
+  sortingLayer: Layer 2
+  sortingOrder: 50
+  quality: 2
+  highQualityMaterial: {fileID: 2100000, guid: 35267f02c1e93584b810e36300f816f8, type: 2}
+  lowQualityMaterial: {fileID: 2100000, guid: 29ab7be584f04b44e917e55346487fa8, type: 2}
+  cutClearZoneHole: 1
+  fogColor: {r: 0.7735849, g: 0.76342314, b: 0.5728907, a: 0.38431373}
+  shadowColor: {r: 0.5188679, g: 0.5188679, b: 0.5188679, a: 0.49019608}
+  density: 0.148
+  coverage: 0.553
+  softness: 0.312
+  windAngle: 84
+  windSpeed: 1
+  layer2SpeedMult: 1.56
+  stretch: 4
+  gustStrength: 0.601
+  gustsPerSecond: 0.15
+  evolveSpeed: 5.46
+  puffSize: 1.79
+  layer2Scale: 1.8
+  layer2Weight: 0.206
+  turbulence: 0
+  bankSize: 8
+  bankGaps: 0.6
+  clearTarget: {fileID: 0}
+  clearCenter: {x: 1, y: -1}
+  clearRadii: {x: 4, y: 6}
+  clearFeather: 0.17
+  clearStrength: 0.134
+  edgeVignette: 0.04
+  pixelSnap: 1
+  pixelsPerUnit: 16
+  alphaSteps: 16
+--- !u!1 &1353761000233218640
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 8637944718697071682}
+  - component: {fileID: 1043617339794061640}
+  - component: {fileID: 1162565206560582479}
+  - component: {fileID: 436450844595731083}
+  m_Layer: 0
+  m_Name: SandstormVisual
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &8637944718697071682
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1353761000233218640}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1948780660925741681}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!33 &1043617339794061640
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1353761000233218640}
+  m_Mesh: {fileID: 0}
+--- !u!23 &1162565206560582479
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1353761000233218640}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 0
+  m_ReflectionProbeUsage: 0
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: bf2341135147ae944a0f0e58b3a1c8a4, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: -44025399
+  m_SortingLayer: 2
+  m_SortingOrder: 50
+  m_MaskInteraction: 0
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &436450844595731083
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1353761000233218640}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 24243c818f187d84381c41ed694435ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FogRadial2D
+  material: {fileID: 2100000, guid: bf2341135147ae944a0f0e58b3a1c8a4, type: 2}
+  radii: {x: 8, y: 8}
+  sortingLayer: Layer 2
+  sortingOrder: 50
+  fogColor: {r: 0.8679245, g: 0.8141592, b: 0.6673193, a: 1}
+  shadowColor: {r: 0.8962264, g: 0.7685352, b: 0.6552599, a: 1}
+  density: 0
+  haze: 0.454
+  coverage: 1
+  softness: 0.5
+  swirlSpeed: 0.05
+  inflowSpeed: 0.35
+  spiralTwist: -0.08
+  layer2SpeedMult: 0
+  gustStrength: 0.081
+  gustsPerSecond: 0.15
+  evolveSpeed: 0.03
+  puffSize: 0.8
+  arcRepeats: 2
+  layer2Scale: 2.49
+  layer2Weight: 0.151
+  turbulence: 1.014
+  outerFeather: 0.564
+  eyeRadius: 0.25
+  eyeFeather: 1
+  eyeOpacity: 0.021
+  edgeRaggedness: 0.567
+  pixelSnap: 1
+  pixelsPerUnit: 16
+  alphaSteps: 0

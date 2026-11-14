@@ -51,7 +51,8 @@ public class CardModal : MonoBehaviour
         health = card.health;
         defHealth = card.defHealth; 
         range = card.range;
-        cost = card.cost;
+        // The battle's weather (Sandstorm) reprices a card the moment it enters play.
+        cost = WeatherSystem.AdjustCost(card, card.cost);
         armor = card.armor;
         collisionDamage = card.collisionDamage;
         canMove = card.canMove;

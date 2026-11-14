@@ -149,7 +149,7 @@ public class MinMaxBrain : AgentBrain
         Agent enemy = Enemy;
         bool isHero = target == enemy.hero;
 
-        int effectiveDmgDealt = Mathf.Max(attacker.modal.attack - target.modal.armor, 0);
+        int effectiveDmgDealt = Mathf.Max(WeatherSystem.ModifyDamage(attacker.modal.attack) - target.modal.armor, 0);
 
         // The swing cannot get through: no damage, no kill, and in melee we still eat the counter. Checked
         // before the hero bonus so a pointless poke at the enemy hero can't be talked into by heroAttackBonus.
@@ -159,7 +159,7 @@ public class MinMaxBrain : AgentBrain
 
         float dist = (target.transform.position - attacker.transform.position).magnitude;
         bool meleeExposure = attacker.modal.range < 2 && dist < 2f;
-        int effectiveCounter = meleeExposure ? Mathf.Max(target.modal.attack - attacker.modal.armor, 0) : 0;
+        int effectiveCounter = meleeExposure ? Mathf.Max(WeatherSystem.ModifyDamage(target.modal.attack) - attacker.modal.armor, 0) : 0;
         bool attackerWillDie = (attacker.modal.health - effectiveCounter) <= 0;
 
         float score;

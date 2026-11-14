@@ -321,7 +321,7 @@ public class GameOverNextMatch : MonoBehaviour
     {
         GauntletNextMatch.RefreshEncounter(encounterIndex, enemyHero, headerText, null, 0f);
         var enemy = GauntletRun.PreviewEnemy(encounterIndex);
-        ShowBlessings(enemy?.Blessings);
+        ShowBlessings(enemy?.Blessings, enemy?.Weather);
     }
 
     /// <summary>Jumps a running switch to its end: both halves home, filled with the selected fight.</summary>
@@ -347,9 +347,20 @@ public class GameOverNextMatch : MonoBehaviour
     }
 
     /// <summary>One row per blessing; a stacked one (Extra Passive) once, with a count. None hides the block.</summary>
-    private void ShowBlessings(IReadOnlyList<GauntletBlessing> blessings)
+    private void ShowBlessings(IReadOnlyList<GauntletBlessing> blessings, WeatherSO weather)
     {
         int shown = BlessingRow.Fill(blessingList, blessingRowPrefab, _rows, blessings);
+
+        // The fight's weather rides under the blessings, worded like one. Fill hides it again next time.
+        if (weather != null && blessingList != null && blessingRowPrefab != null)
+        {
+            if (_rows.Count <= shown) _rows.Add(Instantiate(blessingRowPrefab, blessingList));
+            var row = _rows[shown];
+            row.gameObject.SetActive(true);
+            row.Show(GauntletNextMatch.WeatherLabel(weather), weather.description, 1);
+            shown++;
+        }
+
         if (blessingsRoot != null) blessingsRoot.SetActive(shown > 0);
     }
 }

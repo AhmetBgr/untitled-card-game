@@ -26,6 +26,8 @@ public class ModifiersPopupController : MonoBehaviour
 
     [SerializeField] private ModifierToggleRowView toggleRowPrefab;
     [SerializeField] private ModifierSliderRowView sliderRowPrefab;
+    [Tooltip("The Weather modifier's row: a short slider and room for a weather's name. Empty = the slider row.")]
+    [SerializeField] private ModifierSliderRowView weatherRowPrefab;
 
     [Header("Chrome")]
     [SerializeField] private TMP_Text titleLabel;
@@ -124,8 +126,12 @@ public class ModifiersPopupController : MonoBehaviour
         }
     }
 
-    private ModifierRowView PrefabFor(GameModifierSO modifier) =>
-        modifier.Kind == ModifierValueKind.Bool ? (ModifierRowView)toggleRowPrefab : sliderRowPrefab;
+    private ModifierRowView PrefabFor(GameModifierSO modifier)
+    {
+        if (modifier.Kind == ModifierValueKind.Bool) return toggleRowPrefab;
+        if (modifier is WeatherModifierSO && weatherRowPrefab != null) return weatherRowPrefab;
+        return sliderRowPrefab;
+    }
 
     /// <summary>The wired columns, or the single container for a panel built before columns existed.</summary>
     private List<RectTransform> RowParents()

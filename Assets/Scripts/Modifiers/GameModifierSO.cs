@@ -43,4 +43,14 @@ public abstract class GameModifierSO : ScriptableObject
 
     /// <summary>True when this modifier lets the setup screen pick extra passives for each side.</summary>
     public virtual bool EnablesExtraPassives(float value) => false;
+
+    /// <summary>
+    /// True when this modifier decides the match's weather; <paramref name="weather"/> is then the pick
+    /// (null = clear sky). Called once, as the Game scene loads.
+    /// </summary>
+    public virtual bool TryChooseWeather(float value, out WeatherSO weather)
+    {
+        weather = null;
+        return false;
+    }
 }

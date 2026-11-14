@@ -138,6 +138,9 @@ public class GameManager : Singleton<GameManager>
 
     private readonly HeroPassiveSystem heroPassives = new HeroPassiveSystem();
 
+    /// <summary>This match's weather (never null; a clear sky has no effect). See <see cref="WeatherSystem"/>.</summary>
+    private WeatherSystem weather;
+
     /// <summary>
     /// True while the match being played is the one-off tutorial match — what the tutorial-only UI
     /// (the cards' stat-naming hints) keys off.
@@ -199,6 +202,65 @@ public class GameManager : Singleton<GameManager>
         // Static, so it outlives the scene: re-resolve per match rather than letting a Replay inherit
         // the previous one's answer.
         isTutorialMatch = ResolveIsTutorialMatch();
+
+        // Before anything is drawn: a weather can change what the cards dealt into hand cost.
+        weather = WeatherSystem.Create(gameObject, ResolveWeather(), GauntletRun.BattleWeatherSeed);
+    }
+
+    /// <summary>
+    /// A Forged in Battle fight plays the weather rolled for it; the draft and results screens that share
+    /// this scene, and the tutorial, get none. Other matches follow the weather database's test settings.
+    /// </summary>
+    private static WeatherSO ResolveWeather()
+    {
+        if (GauntletRun.IsActive)
+        {
+            bool fighting = GauntletRun.Location == GauntletRun.RunLocation.Battle && !GauntletRun.RestoreResultsPending;
+            return fighting ? GauntletRun.CurrentWeather : null;
+        }
+
+        if (IsTutorialMatch) return null;
+
+        // A custom game's Weather modifier, when its mode lists one.
+        if (MatchModifiers.TryChooseWeather(out WeatherSO chosen)) return chosen;
+
+        return WeatherDatabaseSO.Load().WeatherOutsideRuns();
+    }
+
+    /// <summary>
+    /// Runs a weather routine (an explosion, a lightning bolt) through the triggered-action scheduler, so
+    /// the damage it deals queues the took-damage and death triggers behind it instead of racing them.
+    /// </summary>
+    public void EnqueueWeatherAction(IEnumerator routine)
+    {
+        if (routine == null) return;
+        EnqueueTriggeredAction(() => StartCoroutine(InvokeWeatherAction(routine)));
+    }
+
+    private IEnumerator InvokeWeatherAction(IEnumerator routine)
+    {
+        // Same shape as the other triggered passes: Finish OUTSIDE the scope (see InvokeOnMinionDeathActions).
+        try
+        {
+            using (ActionHolder.PushScope())
+            {
+                _executingTriggeredActions = true;
+                this.isTesting = false;
+                yield return StartCoroutine(routine);
+            }
+        }
+        finally
+        {
+            FinishTriggeredAction();
+        }
+    }
+
+    /// <summary>A turn-boundary weather phase: queued like any trigger, and the turn waits for it all to settle.</summary>
+    private IEnumerator RunWeatherPhase(IEnumerator routine)
+    {
+        if (routine == null || currentState == GameState.EndGame) yield break;
+        EnqueueWeatherAction(routine);
+        yield return new WaitUntil(() => !HasInFlightTriggeredActions);
     }
 
     void Start()
@@ -337,8 +399,21 @@ public class GameManager : Singleton<GameManager>
         return HeroDatabase.Instance.ResolvePassives(SaveManager.Instance.GetExtraPassives(side));
     }
 
+    IEnumerator BeginWeatherNextFrame()
+    {
+        yield return null;
+        weather.BeginBattle();
+    }
+
     IEnumerator SetupGame()
     {
+        // The weather is on the board from the moment the scene shows, under the versus intro, not dropped
+        // in once the fight starts. One frame first: the board's cells register with the grid in their own
+        // Start, and the weather's tile markers (and the Rock's blocker) need them. Its own coroutine, so the
+        // rest of setup (the intro hiding the heroes) still runs this frame; it lands long before anything
+        // below summons onto the board.
+        StartCoroutine(BeginWeatherNextFrame());
+
         // Seed the hero statlines BEFORE registering passives. Register stamps the standing self
         // modifiers of a hero's passives onto hero.modal (the Summoner's -2 Attack), and
         // HeroController.Initialize re-seeds that same modal from the CardSO. This code runs inline
@@ -438,6 +513,8 @@ public class GameManager : Singleton<GameManager>
         player.curState = Player.State.Waiting;
         //Debug.Log("Player's Turn");
         yield return StartCoroutine(DrawTurnStartCards(player));
+        // Weather first (a meteor lands), then the board's own turn-start triggers, both on the serializer.
+        EnqueueWeatherAction(weather.TurnStarted(true));
         // Queue turn-start through the same serializer as the draw above so it runs AFTER the on-draw
         // pass completes, instead of racing it and clobbering shared ActionHolder state.
         EnqueueTriggeredAction(() => StartCoroutine(InvokeOnTurnStarted()));
@@ -707,6 +784,10 @@ public class GameManager : Singleton<GameManager>
             }
         }
 
+        // Collisions from the moves above settle first, then the weather's end of turn (lightning, wind).
+        yield return new WaitUntil(() => !HasInFlightTriggeredActions);
+        yield return StartCoroutine(RunWeatherPhase(weather.TurnEnded(true)));
+
         StartCoroutine(InvokeOnTurnEnd());
 
         //Debug.Log("Player Ends Turn");
@@ -723,6 +804,8 @@ public class GameManager : Singleton<GameManager>
         opponent.availibleMana = OpponentMaxMana;
 
         yield return StartCoroutine(DrawTurnStartCards(opponent));
+
+        EnqueueWeatherAction(weather.TurnStarted(false));
 
         // Queue turn-start behind the on-draw pass (same serializer) instead of racing it.
         EnqueueTriggeredAction(() => StartCoroutine(InvokeOnTurnStarted()));
@@ -813,6 +896,9 @@ public class GameManager : Singleton<GameManager>
                 }
             }
         }
+
+        yield return new WaitUntil(() => !HasInFlightTriggeredActions);
+        yield return StartCoroutine(RunWeatherPhase(weather.TurnEnded(false)));
 
         yield return new WaitForSeconds(0.5f);
 
@@ -1379,6 +1465,9 @@ public class GameManager : Singleton<GameManager>
         // Pure side effect — safe here mid-summon; must not enqueue triggered actions.
         heroPassives.ApplyAurasOnSummon(minion);
 
+        // Weather stamps after the auras so it stacks on them (Restless Earth's +1 clash, Fog's -1 attack).
+        WeatherSystem.NotifyMinionSummoned(minion);
+
         // Aura indicators read the board (e.g. "dormant until a friendly minion exists"), so the row
         // has to re-evaluate now that owner.minions has changed. Read-only, no triggered action.
         heroPassives.RefreshIndicators();
@@ -1454,6 +1543,11 @@ public class GameManager : Singleton<GameManager>
                     yield return StartCoroutine(ExecuteActions(onAnyMinionSummonedActions));
                 }
             }
+
+            // Weather that reacts to where the minion was summoned (Overgrowth brambles), once its summon
+            // has fully resolved, so its own on-summon effects run before it can be hurt or killed.
+            IEnumerator weatherRoutine = weather.AfterMinionSummoned(summoned);
+            if (weatherRoutine != null) yield return StartCoroutine(weatherRoutine);
 
             // A minion entering play mid-turn is a fresh attack target for the acting player's minions,
             // but the cached canAttack/clickable state was computed before it existed (e.g. the attacker's
@@ -1737,7 +1831,8 @@ public class GameManager : Singleton<GameManager>
         if (mover == null || target == null) return;
         if (mover.modal == null) return;
         if (mover.owner == null || target.owner == null) return;
-        if (mover.owner == target.owner) return; // friendly bump — no damage
+        // Friendly bump: no damage, unless the weather (Restless Earth) turns clashes on allies too.
+        if (mover.owner == target.owner && !WeatherSystem.FriendlyCollisionDamage) return;
 
         int moverDamage = mover.modal.collisionDamage;
         if (moverDamage > 0) target.TakeDamage(moverDamage);

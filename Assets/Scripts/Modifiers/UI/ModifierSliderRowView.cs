@@ -22,6 +22,11 @@ public class ModifierSliderRowView : ModifierRowView
                     slider.minValue = i.min;
                     slider.maxValue = i.max;
                     break;
+                case WeatherModifierSO w:
+                    slider.wholeNumbers = true;
+                    slider.minValue = w.Min;
+                    slider.maxValue = w.Max;
+                    break;
                 case FloatModifierSO f:
                     slider.wholeNumbers = false;
                     slider.minValue = f.min;
