@@ -27,12 +27,3 @@ MonoBehaviour:
   randomWeatherOutsideRuns: 0
   tileMarkerOrderOffset: 1
   tileMarkerAlpha: 0.85
-  hudAnchor: {x: 0, y: 1}
-  hudOffset: {x: 24, y: -190}
-  hudIconSize: 72
-  hudWidth: 320
-  hudNameFontSize: 30
-  hudTextFontSize: 20
-  hudNameColor: {r: 1, g: 0.83, b: 0.42, a: 1}
-  hudTextColor: {r: 1, g: 1, b: 1, a: 1}
-  hudBackgroundColor: {r: 0, g: 0, b: 0, a: 0.55}

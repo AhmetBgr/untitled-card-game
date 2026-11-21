@@ -26,18 +26,6 @@ public class WeatherDatabaseSO : ScriptableObject
     public int tileMarkerOrderOffset = 1;
     [Range(0f, 1f)] public float tileMarkerAlpha = 0.85f;
 
-    [Header("HUD")]
-    [Tooltip("Where the weather badge sits on the game canvas (anchor and pivot share this, 0..1).")]
-    public Vector2 hudAnchor = new Vector2(0f, 1f);
-    public Vector2 hudOffset = new Vector2(24f, -190f);
-    public float hudIconSize = 72f;
-    public float hudWidth = 320f;
-    public float hudNameFontSize = 30f;
-    public float hudTextFontSize = 20f;
-    public Color hudNameColor = new Color(1f, 0.83f, 0.42f, 1f);
-    public Color hudTextColor = Color.white;
-    public Color hudBackgroundColor = new Color(0f, 0f, 0f, 0.55f);
-
     private static WeatherDatabaseSO _cached;
 
     public static WeatherDatabaseSO Load()

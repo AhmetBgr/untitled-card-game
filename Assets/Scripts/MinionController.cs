@@ -117,6 +117,8 @@ public class MinionController : MonoBehaviour
     // finished resolving. While it is up, DestroySelf holds off — see the comment there.
     public bool deathTriggerPending;
     private bool _destroyDeferred;
+    /// <summary>The death animation has played out (the corpse is gone from view, even if the object lingers).</summary>
+    public bool DeathAnimationDone { get; private set; }
     public static event Action<List<MinionController>> OnSelectingMinionForAttack;
     public static event Action<MinionController> OnDied;
     public static event Action<MinionController, MinionController> OnCollided;
@@ -979,6 +981,8 @@ public class MinionController : MonoBehaviour
     // Animation event at the end of the death clip.
     public void DestroySelf()
     {
+        DeathAnimationDone = true;
+
         // The death animation runs on a wall clock (Invoke in Die() + clip length) that is completely
         // independent of the triggered-action scheduler, which defers this minion's own OnDeath behind the
         // play that killed it. A column-clearing spell that kills two minions spends a full second per

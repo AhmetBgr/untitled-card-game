@@ -9,6 +9,10 @@ public class BrambleWeatherSO : WeatherSO
     [Min(1)] public int brambleTiles = 2;
     [Min(0)] public int damage = 1;
 
+    [Tooltip("Prefab laid on each bramble tile (centred on the cell; sorting comes from the prefab). " +
+             "Empty = the plain tile sprite marker.")]
+    public GameObject cellPrefab;
+
     public override WeatherEffect CreateEffect() => new BrambleWeather();
 }
 
@@ -22,7 +26,8 @@ public class BrambleWeather : WeatherEffect
         foreach (var cell in Board.RandomCells(Cfg.brambleTiles))
         {
             _brambles.Add(cell);
-            Board.SpawnTileMarker(cell, Config.TileSprite, Config.tileTint, "Bramble");
+            if (Cfg.cellPrefab != null) Board.SpawnTilePrefab(cell, Cfg.cellPrefab, "Bramble");
+            else Board.SpawnTileMarker(cell, Config.TileSprite, Config.tileTint, "Bramble");
         }
     }
 

@@ -10,15 +10,28 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 403fb72e71f05ac4396929b594604ba3, type: 3}
-  m_Name: VolatileAir
+  m_Name: ExplosiveDeath
   m_EditorClassIdentifier: Assembly-CSharp::ExplodingDeathWeatherSO
-  weatherName: Volatile Air
-  description: Minions explode when they die, dealing 1 damage to adjacent minions.
-  icon: {fileID: 0}
+  weatherName: Explosive Death
+  description: Minions at 1 Health explode when they die, dealing 1 damage to adjacent
+    minions.
+  icon: {fileID: 21300000, guid: faddacc27daa68c499518c62a154d9c3, type: 3}
   tileSprite: {fileID: 0}
   tileTint: {r: 1, g: 0.55, b: 0.15, a: 1}
   visualPrefab: {fileID: 8087220669654119443, guid: 2f67e6ba06828784e81015791285e80a,
     type: 3}
+  ambience: {fileID: 0}
+  ambienceFade: 3
   inRandomPool: 1
   explosionDamage: 1
+  explodeAtHealth: 1
+  maxDeathWait: 3
+  delayAfterDeath: 0.35000002
+  blastPrefab: {fileID: 6888479945810672510, guid: f0f66405f52dee3488ebe0fe8e4faf3d,
+    type: 3}
+  blastLifetime: 2
+  blastScale: 0.7
   blastTint: {r: 1, g: 0.55, b: 0.15, a: 1}
+  warningPrefab: {fileID: 3394571420515938321, guid: d7288b61b23565840bbdf2b0d65ba260,
+    type: 3}
+  warningOffset: {x: 0, y: 0}

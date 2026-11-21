@@ -15,12 +15,16 @@ MonoBehaviour:
   weatherName: Overgrowth
   description: 2 random tiles are covered in brambles. A minion takes 1 damage when
     it moves onto or is summoned on one.
-  icon: {fileID: 5781445747943558089, guid: 3bf9d7613451bac44adfe38ab8230e5c, type: 3}
+  icon: {fileID: 21300000, guid: 5208661fb254bf74b82eb0e636e64bfd, type: 3}
   tileSprite: {fileID: 5781445747943558089, guid: 3bf9d7613451bac44adfe38ab8230e5c,
     type: 3}
   tileTint: {r: 0.45, g: 0.8, b: 0.35, a: 1}
   visualPrefab: {fileID: 5471212293823651665, guid: 36516426f782b62419f90df53ccc2b04,
     type: 3}
+  ambience: {fileID: 0}
+  ambienceFade: 3
   inRandomPool: 1
   brambleTiles: 2
   damage: 1
+  cellPrefab: {fileID: 1533216328950797499, guid: 3d3090d872f46d540bafdfec1cbcafe3,
+    type: 3}

@@ -14,11 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SandstormWeatherSO
   weatherName: Sandstorm
   description: Spells cost 1 less, and minions cost 1 more.
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 8fdeceb579f7c8e4bbf49d70077aac89, type: 3}
   tileSprite: {fileID: 0}
   tileTint: {r: 0.9, g: 0.75, b: 0.45, a: 1}
   visualPrefab: {fileID: 1353761000233218640, guid: ec4328fb0ae24874ca29c3373088c897,
     type: 3}
+  ambience: {fileID: 0}
+  ambienceFade: 3
   inRandomPool: 1
   spellCostChange: -1
   minionCostChange: 1

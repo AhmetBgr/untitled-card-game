@@ -102,6 +102,22 @@ public abstract class WeatherEffect
     /// <summary>Every frame while the battle runs, for visuals that track live board state (e.g. a warning).</summary>
     public virtual void Tick() { }
 
-    /// <summary>A short live line under the weather's name on the HUD (a countdown), or null.</summary>
+    /// <summary>A short live line under the weather's description in its HUD tooltip, or null.</summary>
     public virtual string Status => null;
+
+    /// <summary>
+    /// Turns until this weather next fires, shown as a number on its HUD icon (1 = this turn), or null for
+    /// a weather with no timer. Units are the weather's own (Strong Wind counts every turn, Thunderstorm
+    /// only yours); <see cref="Status"/> spells them out in the tooltip.
+    /// </summary>
+    public virtual int? Countdown => null;
+
+    /// <summary>
+    /// What the badge on the HUD icon reads, or null for no badge. Defaults to <see cref="Countdown"/>;
+    /// override to show something else (Thunderstorm shows its strike chance, "30%").
+    /// </summary>
+    public virtual string Badge => Countdown?.ToString();
+
+    /// <summary>The badge is drawn in the warning colour: the weather fires this turn (or is certain to).</summary>
+    public virtual bool BadgeUrgent => Countdown.HasValue && Countdown.Value <= 1;
 }

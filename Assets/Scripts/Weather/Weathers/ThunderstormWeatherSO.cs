@@ -2,13 +2,24 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>Thunderstorm: from the player's 3rd turn (configurable), at the end of each of their turns, lightning strikes the minion with the most health.</summary>
+/// <summary>
+/// Thunderstorm: at the end of each of the player's turns, from the first, every minion tied for the most
+/// health rolls on its own to be struck by lightning. The chance starts low and climbs after every turn's
+/// rolls, strike or not, so the storm grows more dangerous the longer the battle runs.
+/// </summary>
 [CreateAssetMenu(fileName = "ThunderstormWeather", menuName = "Weather/Thunderstorm")]
 public class ThunderstormWeatherSO : WeatherSO
 {
     [Min(0)] public int damage = 1;
-    [Tooltip("Your turn number (1 = your first turn) whose end brings the first bolt. Before it the storm only rains.")]
-    [Min(1)] public int firstStrikeTurn = 3;
+
+    [Header("Chance")]
+    [Tooltip("Percent chance of a strike at the end of your first turn.")]
+    [Range(0, 100)] public int startChance = 30;
+    [Tooltip("Percent added to the chance after every end of your turn, whether anything was struck or not.")]
+    [Min(0)] public int chanceIncrease = 10;
+    [Tooltip("The chance never climbs past this.")]
+    [Range(0, 100)] public int maxChance = 90;
+
     public Color boltTint = new Color(0.75f, 0.85f, 1f, 1f);
 
     [Header("Warning")]
@@ -16,7 +27,7 @@ public class ThunderstormWeatherSO : WeatherSO
              "Follows the minion. Its breathing comes from its sprites' material (SpriteBreath). " +
              "Empty = the weather icon as a fallback.")]
     public GameObject warningPrefab;
-    [Tooltip("Offset from the minion's position (world units).")]
+    [Tooltip("Offset from the minion's centre (its local space).")]
     public Vector2 warningOffset = Vector2.zero;
 
     public override WeatherEffect CreateEffect() => new ThunderstormWeather();
@@ -31,48 +42,43 @@ public class ThunderstormWeather : WeatherEffect
     private readonly List<MinionController> _scratch = new List<MinionController>();
     private bool _striking;
 
-    /// <summary>Your turns started so far this battle (1 during your first turn).</summary>
-    private static int PlayerTurn => GameManager.Instance != null ? GameManager.Instance.PlayerTurnsStarted : 0;
+    /// <summary>Percent chance each target is struck at the end of your next turn.</summary>
+    private int _chance;
 
-    /// <summary>The storm has started striking: from the first strike turn on (and the enemy turns after it).</summary>
-    private bool Active => PlayerTurn >= Cfg.firstStrikeTurn;
+    private int MaxChance => Mathf.Clamp(Cfg.maxChance, 0, 100);
 
-    public override IEnumerator OnTurnEnded(bool playerTurn) => playerTurn && Active ? Strike() : null;
+    public override void OnBattleStart() => _chance = Mathf.Clamp(Cfg.startChance, 0, MaxChance);
 
-    public override string Status
+    public override IEnumerator OnTurnEnded(bool playerTurn)
     {
-        get
-        {
-            int turnsLeft = Cfg.firstStrikeTurn - PlayerTurn;
-            if (turnsLeft <= 0) return "Strikes at the end of your turn";
-            return turnsLeft == 1 ? "First strike: end of your next turn" : $"First strike: end of your turn {Cfg.firstStrikeTurn}";
-        }
+        if (!playerTurn) return null;
+
+        // The rolls happen when the strike runs (the targets are picked then); the odds rise now, once per turn.
+        int chance = _chance;
+        _chance = Mathf.Min(MaxChance, _chance + Cfg.chanceIncrease);
+        return Strike(chance);
     }
+
+    public override string Badge => $"{_chance}%";
+
+    public override bool BadgeUrgent => _chance >= MaxChance;
+
+    public override string Status => _chance >= MaxChance
+        ? $"Each marked minion: {_chance}% chance to be struck at the end of your turn (maximum)"
+        : $"Each marked minion: {_chance}% chance to be struck at the end of your turn (+{Cfg.chanceIncrease}% each turn, up to {MaxChance}%)";
 
     public override void Tick()
     {
         // Health changes come from many places (damage, buffs, heals, deaths), so just re-check every frame:
         // a 3x3 board is a handful of minions.
-        if (_striking) { FollowMinions(); return; }
+        if (_striking) return;
 
-        // No target marked before the storm can strike.
-        if (Active) Tallest(_scratch);
-        else _scratch.Clear();
+        // Every minion the next bolt would hit is marked, whatever the odds.
+        Tallest(_scratch);
         foreach (var minion in new List<MinionController>(_warnings.Keys))
             if (!_scratch.Contains(minion)) RemoveWarning(minion);
         foreach (var minion in _scratch)
-            if (!_warnings.ContainsKey(minion)) _warnings[minion] = SpawnWarning();
-        FollowMinions();
-    }
-
-    private void FollowMinions()
-    {
-        foreach (var pair in _warnings)
-        {
-            if (pair.Key == null || pair.Value == null) continue;
-            Vector3 p = pair.Key.transform.position;
-            pair.Value.transform.position = new Vector3(p.x + Cfg.warningOffset.x, p.y + Cfg.warningOffset.y, pair.Value.transform.position.z);
-        }
+            if (!_warnings.ContainsKey(minion)) _warnings[minion] = SpawnWarning(minion);
     }
 
     private void Tallest(List<MinionController> into)
@@ -86,17 +92,18 @@ public class ThunderstormWeather : WeatherEffect
         }
     }
 
-    private GameObject SpawnWarning()
+    /// <summary>The warning, as a child of the minion: it moves, hides and dies with it.</summary>
+    private GameObject SpawnWarning(MinionController minion)
     {
         GameObject go;
         if (Cfg.warningPrefab != null)
         {
-            go = Object.Instantiate(Cfg.warningPrefab, Board.transform);
+            go = Object.Instantiate(Cfg.warningPrefab, minion.transform);
         }
         else
         {
             go = new GameObject("ThunderWarning");
-            go.transform.SetParent(Board.transform, false);
+            go.transform.SetParent(minion.transform, false);
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = Config.icon;
             sr.sortingLayerName = "Layer 3";
@@ -104,6 +111,7 @@ public class ThunderstormWeather : WeatherEffect
             go.transform.localScale = Vector3.one * 0.4f;
         }
         go.name = "ThunderWarning";
+        go.transform.localPosition = new Vector3(Cfg.warningOffset.x, Cfg.warningOffset.y, 0f);
         return go;
     }
 
@@ -113,11 +121,13 @@ public class ThunderstormWeather : WeatherEffect
         _warnings.Remove(minion);
     }
 
-    private IEnumerator Strike()
+    private IEnumerator Strike(int chance)
     {
-        // Every minion tied for the most health is hit, all by the same strike.
+        // Every minion tied for the most health rolls on its own; the ones that fail are all hit by one strike.
+        // Rolled on the battle's own stream, so a restarted Forged in Battle fight gets the same storm.
         var targets = new List<MinionController>();
         Tallest(targets);
+        targets.RemoveAll(_ => Board.Rng.Next(100) >= chance);
         if (targets.Count == 0) yield break;
 
         _striking = true;

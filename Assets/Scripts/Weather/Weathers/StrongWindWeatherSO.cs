@@ -41,6 +41,8 @@ public class StrongWindWeather : WeatherEffect
         ? $"Blowing {DirName}: gust at the end of this turn"
         : $"Blowing {DirName}: gust in {_turnsLeft} turns";
 
+    public override int? Countdown => Mathf.Max(1, _turnsLeft);
+
     public override IEnumerator OnTurnEnded(bool playerTurn)
     {
         _turnsLeft--;

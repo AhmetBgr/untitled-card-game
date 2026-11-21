@@ -13,9 +13,10 @@ MonoBehaviour:
   m_Name: Thunderstorm
   m_EditorClassIdentifier: Assembly-CSharp::ThunderstormWeatherSO
   weatherName: Thunderstorm
-  description: From your 3rd turn, at the end of your turn, lightning hits every minion
-    tied for the highest health for 1 damage.
-  icon: {fileID: 21300000, guid: 9a1214b8c6bb3c143b3a91caa05cbc44, type: 3}
+  description: At the end of your turn, each minion tied for the highest health has
+    a chance to be hit by lightning for 1 damage. Starts at 30%, rising by 10% every
+    turn, up to 90%.
+  icon: {fileID: 21300000, guid: 252a46f049ed1ac439419d12bb564b51, type: 3}
   tileSprite: {fileID: 0}
   tileTint: {r: 1, g: 1, b: 1, a: 1}
   visualPrefab: {fileID: 568961369031494052, guid: 8c8ff1efae810df41be991f4914af252,
@@ -24,6 +25,9 @@ MonoBehaviour:
   ambienceFade: 3
   inRandomPool: 1
   damage: 1
+  startChance: 30
+  chanceIncrease: 10
+  maxChance: 90
   boltTint: {r: 0.75, g: 0.85, b: 1, a: 1}
   warningPrefab: {fileID: 6528273582048852722, guid: dc4482c9f572167499a7508f032c53b2,
     type: 3}

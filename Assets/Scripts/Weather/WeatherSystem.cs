@@ -2,13 +2,11 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using DG.Tweening;
-using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 /// <summary>
 /// The weather of the battle being fought: owns its <see cref="WeatherEffect"/>, the markers it lays on
-/// the board and the HUD badge naming it. GameManager creates it in Awake and drives the turn hooks; the
+/// the board and the scene's HUD icon for it (<see cref="WeatherHudView"/>). GameManager creates it in Awake and drives the turn hooks; the
 /// rest of the game asks it through the static facade (<see cref="ModifyDamage"/>,
 /// <see cref="AdjustCost"/>, <see cref="FriendlyCollisionDamage"/>, ...), which is a no-op with no
 /// weather, so a clear-sky match plays exactly as before.
@@ -19,8 +17,11 @@ public class WeatherSystem : MonoBehaviour
 {
     public static WeatherSystem Current { get; private set; }
 
-    /// <summary>The live weather, or null for a clear sky.</summary>
-    public static WeatherEffect Effect => Current != null ? Current._effect : null;
+    /// <summary>
+    /// The live weather, or null for a clear sky. Also null once the battle is over: the weather's visuals
+    /// stay up, but it stops touching the game (e.g. Sandstorm no longer reprices the draft's reward cards).
+    /// </summary>
+    public static WeatherEffect Effect => Current != null && !Current.IsBattleOver ? Current._effect : null;
 
     public WeatherSO Weather { get; private set; }
     public WeatherDatabaseSO Database { get; private set; }
@@ -32,8 +33,7 @@ public class WeatherSystem : MonoBehaviour
     private bool _started;
     private readonly List<GameObject> _spawned = new List<GameObject>();
 
-    private TextMeshProUGUI _hudStatus;
-    private RectTransform _hudRoot;
+    private WeatherHudView _hud;
 
     // ---------------------------------------------------------------- Setup
 
@@ -70,6 +70,8 @@ public class WeatherSystem : MonoBehaviour
     private void OnDestroy()
     {
         if (Current == this) Current = null;
+        // The HUD lives in the scene, which can outlast the battle (draft and results screens share it).
+        if (_hud != null) _hud.Hide();
         if (_ambiencePlaying && AudioManager.Exists) AudioManager.Instance.StopWeatherAmbience(Weather.ambienceFade);
     }
 
@@ -84,7 +86,7 @@ public class WeatherSystem : MonoBehaviour
         if (_started || _effect == null) return;
         _started = true;
 
-        BuildHud();
+        ShowHud();
         SpawnVisual();
         PlayAmbience();
         _effect.OnBattleStart();
@@ -154,9 +156,21 @@ public class WeatherSystem : MonoBehaviour
 
     // ---------------------------------------------------------------- Turn hooks (GameManager)
 
-    public IEnumerator TurnStarted(bool playerTurn) => Wrap(_effect?.OnTurnStarted(playerTurn));
+    // The HUD is refreshed on every turn change, not only after a hook that does something: a countdown
+    // ticks down on turns where the weather itself stays quiet.
+    public IEnumerator TurnStarted(bool playerTurn)
+    {
+        var routine = Wrap(_effect?.OnTurnStarted(playerTurn));
+        RefreshHud();
+        return routine;
+    }
 
-    public IEnumerator TurnEnded(bool playerTurn) => Wrap(_effect?.OnTurnEnded(playerTurn));
+    public IEnumerator TurnEnded(bool playerTurn)
+    {
+        var routine = Wrap(_effect?.OnTurnEnded(playerTurn));
+        RefreshHud();
+        return routine;
+    }
 
     /// <summary>Called from inside the summon broadcast (already on the scheduler); null when nothing happens.</summary>
     public IEnumerator AfterMinionSummoned(MinionController minion)
@@ -426,120 +440,22 @@ public class WeatherSystem : MonoBehaviour
 
     // ---------------------------------------------------------------- HUD
 
-    /// <summary>Re-reads the effect's live status line (a countdown) into the badge.</summary>
-    public void RefreshHud()
+    /// <summary>Shows the weather on the scene's <see cref="WeatherHudView"/> (UICanvas/WeatherHUD).</summary>
+    private void ShowHud()
     {
-        if (_hudStatus == null || _effect == null) return;
-        string status = _effect.Status;
-        _hudStatus.gameObject.SetActive(!string.IsNullOrEmpty(status));
-        _hudStatus.text = status ?? string.Empty;
-    }
-
-    /// <summary>
-    /// The weather badge: icon, name, rules text and live status, built at runtime on the game canvas so
-    /// no scene needs wiring. Placement and look come from <see cref="WeatherDatabaseSO"/>.
-    /// </summary>
-    private void BuildHud()
-    {
-        Canvas canvas = FindGameCanvas();
-        if (canvas == null)
+        _hud = WeatherHudView.Find();
+        if (_hud == null)
         {
-            Debug.LogWarning("[Weather] No game canvas found for the weather badge.");
+            Debug.LogWarning("[Weather] No WeatherHudView in the scene; the weather has no HUD icon.");
             return;
         }
-
-        var db = Database;
-        TMP_FontAsset font = FindFont(canvas);
-
-        var root = new GameObject("WeatherHUD", typeof(RectTransform), typeof(Image), typeof(HorizontalLayoutGroup), typeof(ContentSizeFitter));
-        _hudRoot = (RectTransform)root.transform;
-        _hudRoot.SetParent(canvas.transform, false);
-        // First sibling: every panel and popup on the canvas draws over it.
-        _hudRoot.SetAsFirstSibling();
-        _hudRoot.anchorMin = _hudRoot.anchorMax = _hudRoot.pivot = db.hudAnchor;
-        _hudRoot.anchoredPosition = db.hudOffset;
-        _spawned.Add(root);
-
-        var bg = root.GetComponent<Image>();
-        bg.color = db.hudBackgroundColor;
-        bg.raycastTarget = false;
-
-        var row = root.GetComponent<HorizontalLayoutGroup>();
-        row.padding = new RectOffset(12, 16, 10, 10);
-        row.spacing = 12;
-        row.childAlignment = TextAnchor.MiddleLeft;
-        row.childControlWidth = row.childControlHeight = true;
-        row.childForceExpandWidth = row.childForceExpandHeight = false;
-
-        var fit = root.GetComponent<ContentSizeFitter>();
-        fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fit.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        if (Weather.icon != null)
-        {
-            var iconGo = new GameObject("Icon", typeof(RectTransform), typeof(Image), typeof(LayoutElement));
-            iconGo.transform.SetParent(_hudRoot, false);
-            var icon = iconGo.GetComponent<Image>();
-            icon.sprite = Weather.icon;
-            icon.preserveAspect = true;
-            icon.raycastTarget = false;
-            var le = iconGo.GetComponent<LayoutElement>();
-            le.preferredWidth = le.preferredHeight = db.hudIconSize;
-        }
-
-        var column = new GameObject("Text", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
-        column.transform.SetParent(_hudRoot, false);
-        var col = column.GetComponent<VerticalLayoutGroup>();
-        col.spacing = 2;
-        col.childControlWidth = col.childControlHeight = true;
-        col.childForceExpandWidth = true;
-        col.childForceExpandHeight = false;
-        column.GetComponent<LayoutElement>().preferredWidth = db.hudWidth;
-
-        Label(column.transform, "Name", Weather.DisplayName, db.hudNameFontSize, db.hudNameColor, font, FontStyles.Bold);
-        if (!string.IsNullOrEmpty(Weather.description))
-            Label(column.transform, "Description", Weather.description, db.hudTextFontSize, db.hudTextColor, font, FontStyles.Normal);
-        _hudStatus = Label(column.transform, "Status", string.Empty, db.hudTextFontSize, db.hudNameColor, font, FontStyles.Italic);
-
-        _hudRoot.localScale = Vector3.zero;
-        _hudRoot.DOScale(1f, 0.35f).SetEase(Ease.OutBack).SetDelay(0.2f).SetLink(root);
+        _hud.Show(Weather);
     }
 
-    private static TextMeshProUGUI Label(Transform parent, string name, string text, float size, Color color,
-        TMP_FontAsset font, FontStyles style)
+    /// <summary>Re-reads the effect's live badge and status line into the HUD.</summary>
+    public void RefreshHud()
     {
-        var go = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
-        go.transform.SetParent(parent, false);
-        var tmp = go.GetComponent<TextMeshProUGUI>();
-        if (font != null) tmp.font = font;
-        tmp.text = text;
-        tmp.fontSize = size;
-        tmp.color = color;
-        tmp.fontStyle = style;
-        tmp.textWrappingMode = TextWrappingModes.Normal;
-        tmp.raycastTarget = false;
-        return tmp;
-    }
-
-    /// <summary>The root canvas the played cards fly over, i.e. the game's own HUD canvas.</summary>
-    private static Canvas FindGameCanvas()
-    {
-        if (PlayArea.Instance != null && PlayArea.Instance.PlayedCardParent != null)
-        {
-            var c = PlayArea.Instance.PlayedCardParent.GetComponentInParent<Canvas>();
-            if (c != null) return c.rootCanvas;
-        }
-
-        foreach (var c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
-            if (c.isRootCanvas && c.gameObject.activeInHierarchy) return c;
-        return null;
-    }
-
-    /// <summary>The font the game's own UI is set in, so the badge doesn't stand out in LiberationSans.</summary>
-    private static TMP_FontAsset FindFont(Canvas canvas)
-    {
-        foreach (var t in canvas.GetComponentsInChildren<TextMeshProUGUI>(true))
-            if (t.font != null) return t.font;
-        return TMP_Settings.defaultFontAsset;
+        if (_hud == null || _effect == null) return;
+        _hud.Refresh(_effect.Badge, _effect.BadgeUrgent, _effect.Status);
     }
 }

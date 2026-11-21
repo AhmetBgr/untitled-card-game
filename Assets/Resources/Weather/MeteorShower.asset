@@ -15,11 +15,13 @@ MonoBehaviour:
   weatherName: Meteor Shower
   description: At the start of your turn, a meteor falls on the marked tile and deals
     3 damage.
-  icon: {fileID: 21300000, guid: 9a1214b8c6bb3c143b3a91caa05cbc44, type: 3}
+  icon: {fileID: 21300000, guid: 2f8e61d37c0085442b7a40a388a15fbd, type: 3}
   tileSprite: {fileID: 21300000, guid: 9a1214b8c6bb3c143b3a91caa05cbc44, type: 3}
   tileTint: {r: 1, g: 0.3, b: 0.2, a: 1}
   visualPrefab: {fileID: 7019012725529447814, guid: 0098e0daf3e40c64d8d5dd8dfb8a0baa,
     type: 3}
+  ambience: {fileID: 0}
+  ambienceFade: 3
   inRandomPool: 1
   damage: 2
   fallPrefab: {fileID: 6192539891376268159, guid: 0539518031378de45a08bda184ad4c6e,

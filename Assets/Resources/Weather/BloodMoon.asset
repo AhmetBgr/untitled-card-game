@@ -14,10 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::DamageMultiplierWeatherSO
   weatherName: Blood Moon
   description: All damage is doubled.
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 60545c6615ab75d43a2cc7ee4699ede6, type: 3}
   tileSprite: {fileID: 0}
   tileTint: {r: 1, g: 1, b: 1, a: 1}
   visualPrefab: {fileID: 3405643933137007273, guid: 02a3f06521b342644afe2022dbe9cb2d,
     type: 3}
+  ambience: {fileID: 0}
+  ambienceFade: 3
   inRandomPool: 1
   multiplier: 2

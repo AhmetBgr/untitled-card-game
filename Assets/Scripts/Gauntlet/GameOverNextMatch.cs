@@ -39,6 +39,8 @@ public class GameOverNextMatch : MonoBehaviour
         public Graphic skull;
         public GameObject highlight;
         public GameObject defeatedMark;
+        [Tooltip("The fight's weather, under its skull; hidden for a clear sky. Hovering it names the weather.")]
+        public Image weatherIcon;
     }
 
     [Header("Briefing")]
@@ -321,7 +323,7 @@ public class GameOverNextMatch : MonoBehaviour
     {
         GauntletNextMatch.RefreshEncounter(encounterIndex, enemyHero, headerText, null, 0f);
         var enemy = GauntletRun.PreviewEnemy(encounterIndex);
-        ShowBlessings(enemy?.Blessings, enemy?.Weather);
+        ShowBlessings(enemy?.Blessings);
     }
 
     /// <summary>Jumps a running switch to its end: both halves home, filled with the selected fight.</summary>
@@ -343,24 +345,35 @@ public class GameOverNextMatch : MonoBehaviour
             GauntletBattleTrack.RefreshNode(node.skull, node.highlight, node.defeatedMark, i, beatenSkullTint);
             if (node.highlight != null) node.highlight.SetActive(i == Selected);
             if (node.button != null) node.button.interactable = i < GauntletRun.EncounterCount;
+            ShowWeather(node.weatherIcon, i);
         }
     }
 
     /// <summary>One row per blessing; a stacked one (Extra Passive) once, with a count. None hides the block.</summary>
-    private void ShowBlessings(IReadOnlyList<GauntletBlessing> blessings, WeatherSO weather)
+    private void ShowBlessings(IReadOnlyList<GauntletBlessing> blessings)
     {
         int shown = BlessingRow.Fill(blessingList, blessingRowPrefab, _rows, blessings);
-
-        // The fight's weather rides under the blessings, worded like one. Fill hides it again next time.
-        if (weather != null && blessingList != null && blessingRowPrefab != null)
-        {
-            if (_rows.Count <= shown) _rows.Add(Instantiate(blessingRowPrefab, blessingList));
-            var row = _rows[shown];
-            row.gameObject.SetActive(true);
-            row.Show(GauntletNextMatch.WeatherLabel(weather), weather.description, 1);
-            shown++;
-        }
-
         if (blessingsRoot != null) blessingsRoot.SetActive(shown > 0);
+    }
+
+    /// <summary>The fight's weather icon under its skull, with its name and rules as the tooltip.</summary>
+    private static void ShowWeather(Image icon, int encounterIndex)
+    {
+        if (icon == null) return;
+
+        var weather = encounterIndex < GauntletRun.EncounterCount ? GauntletRun.PreviewEnemy(encounterIndex)?.Weather : null;
+        bool show = weather != null && weather.icon != null;
+        icon.gameObject.SetActive(show);
+        if (!show) return;
+
+        icon.sprite = weather.icon;
+        icon.preserveAspect = true;
+        icon.raycastTarget = true;
+
+        var tooltip = icon.GetComponent<UITooltipTrigger>();
+        if (tooltip == null) tooltip = icon.gameObject.AddComponent<UITooltipTrigger>();
+        tooltip.Message = string.IsNullOrEmpty(weather.description)
+            ? $"<b>{weather.DisplayName}</b>"
+            : $"<b>{weather.DisplayName}</b>\n{weather.description}";
     }
 }

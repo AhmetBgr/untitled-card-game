@@ -14,10 +14,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FogWeatherSO
   weatherName: Fog
   description: A random column is covered in fog. Minions in the fog have -1 Attack.
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: 77ed972c021ad484f9ee3ef707f3a616, type: 3}
   tileSprite: {fileID: 0}
   tileTint: {r: 0.85, g: 0.9, b: 0.95, a: 0.4}
   visualPrefab: {fileID: 7800382237811944522, guid: 002caff4c3af04c4f8dc6bcca25c2563,
     type: 3}
+  ambience: {fileID: 0}
+  ambienceFade: 3
   inRandomPool: 1
   attackPenalty: 1
+  markTiles: 0

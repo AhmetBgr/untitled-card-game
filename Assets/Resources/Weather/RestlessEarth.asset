@@ -12,14 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 09422a9c109477c4b9f59afd75d2fef0, type: 3}
   m_Name: RestlessEarth
   m_EditorClassIdentifier: Assembly-CSharp::ClashWeatherSO
-  weatherName: Restless Earth
+  weatherName: Hardened Shell
   description: Every minion has +1 clash damage, and clashes also damage friendly
     minions.
-  icon: {fileID: 2071410874, guid: 17c69b4cf4d539e439fb996e084169ca, type: 3}
+  icon: {fileID: 21300000, guid: 94c7bd74be3ce66438918f4b357bad27, type: 3}
   tileSprite: {fileID: 0}
   tileTint: {r: 1, g: 1, b: 1, a: 1}
   visualPrefab: {fileID: 2503231683347804581, guid: 526564b5320f95d45877d95f8d3de04f,
     type: 3}
+  ambience: {fileID: 0}
+  ambienceFade: 3
   inRandomPool: 1
   bonusClashDamage: 1
   damagesFriendlyMinions: 1

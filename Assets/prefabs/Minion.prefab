@@ -380,7 +380,7 @@ Canvas:
   m_VertexColorAlwaysGammaSpace: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
-  m_SortingLayerID: -44025399
+  m_SortingLayerID: -105541197
   m_SortingOrder: 0
   m_TargetDisplay: 0
 --- !u!114 &5804588061918966470
@@ -1952,7 +1952,7 @@ SortingGroup:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4113462982911207717}
-  m_Enabled: 1
+  m_Enabled: 0
   m_SortingLayerID: -1869315837
   m_SortingLayer: 1
   m_SortingOrder: 2
